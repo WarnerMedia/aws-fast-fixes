@@ -12,6 +12,26 @@ This exists to make old-school on-prem crypto-compliance folks happy. However se
 
 This script will iterate through all your regions and attempt to list all your keys. If you have permission to the key (ie it is not locked down to a specific principal), it will issue the [EnableKeyRotation API](https://docs.aws.amazon.com/kms/latest/APIReference/API_EnableKeyRotation.html) call.
 
+Note: often times a KMS Key Policy has a specific principal specified and even an account admin does not have permission to list or interrogate the KMS key. These will be reported as WARNING to stdout.
+
+## Usage
+
+```bash
+usage: enable-kms-key-rotation.py [-h] [--debug] [--error] [--timestamp]
+                                  [--region REGION] [--actually-do-it]
+
+optional arguments:
+  -h, --help        show this help message and exit
+  --debug           print debugging info
+  --error           print error info only
+  --timestamp       Output log with timestamp and toolname
+  --region REGION   Only Process Specified Region
+  --actually-do-it  Actually Perform the action
+```
+
+You must specify `--actually-do-it` for the changes to be made. Otherwise the script runs in dry-run mode only.
+
+
 ## AWS Docs
 
 * [Rotating Customer Master Keys](https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html)
