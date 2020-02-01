@@ -36,12 +36,13 @@ def main(args, logger):
                         logger.info(f"Enabling KMS Key Rotation on KeyId {k}")
                         enable_key_rotation(kms_client, k)
                     else:
-                        logger.info(f"You Need To KMS Key Rotation on KeyId {k}")
+                        logger.info(f"You Need To Enable KMS Key Rotation on KeyId {k}")
             except ClientError as e:
                 if e.response['Error']['Code'] == 'AccessDeniedException':
                     logger.warning(f"Unable to get details of key {k} in {region}: AccessDenied")
                     continue
-
+            else:
+                raise
 
 def enable_key_rotation(kms_client, KeyId):
     '''Actually perform the enabling of Key rotation and checking of the status code'''
