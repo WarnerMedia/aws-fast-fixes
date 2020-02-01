@@ -8,11 +8,20 @@ import logging
 
 
 def main(args, logger):
+    '''Executes the Primary Logic of the Fast Fix'''
 
-    all_regions = get_regions(args)
+    # If they specify a profile use it. Otherwise do the normal thing
+    if args.profile:
+        session = boto3.Session(profile_name=args.profile)
+    else:
+        session = boto3.Session()
+
+    # Get all the Regions for this account
+    all_regions = get_regions(session, args)
 
     for region in all_regions:
-        kms_client = boto3.client("kms", region_name = region)
+        logger.debug(f"Processing {region}")
+        kms_client = session.client("kms", region_name=region)
         keys = get_all_keys(kms_client)
         for k in keys:
             try:
@@ -30,7 +39,7 @@ def main(args, logger):
                         logger.info(f"You Need To KMS Key Rotation on KeyId {k}")
             except ClientError as e:
                 if e.response['Error']['Code'] == 'AccessDeniedException':
-                    logger.warning(f"Unable to get details of key {k}: AccessDenied")
+                    logger.warning(f"Unable to get details of key {k} in {region}: AccessDenied")
                     continue
 
 
@@ -59,15 +68,15 @@ def get_all_keys(kms_client):
     return(key_ids)
 
 
-def get_regions(args):
+def get_regions(session, args):
     '''Return a list of regions with us-east-1 first. If --region was specified, return a list wth just that'''
 
     # If we specifed a region on the CLI, return a list of just that
-    if hasattr(args, 'region'):
+    if args.region:
         return([args.region])
 
     # otherwise return all the regions, us-east-1 first
-    ec2 = boto3.client('ec2')
+    ec2 = session.client('ec2')
     response = ec2.describe_regions()
     output = ['us-east-1']
     for r in response['Regions']:
@@ -86,6 +95,7 @@ def do_args():
     parser.add_argument("--error", help="print error info only", action='store_true')
     parser.add_argument("--timestamp", help="Output log with timestamp and toolname", action='store_true')
     parser.add_argument("--region", help="Only Process Specified Region")
+    parser.add_argument("--profile", help="Use this CLI profile (instead of default or env credentials)")
     parser.add_argument("--actually-do-it", help="Actually Perform the action", action='store_true')
 
     args = parser.parse_args()

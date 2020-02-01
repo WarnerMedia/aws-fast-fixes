@@ -26,6 +26,7 @@ optional arguments:
   --error           print error info only
   --timestamp       Output log with timestamp and toolname
   --region REGION   Only Process Specified Region
+  --profile PROFILE  Use this CLI profile (instead of default or env credentials)
   --actually-do-it  Actually Perform the action
 ```
 
