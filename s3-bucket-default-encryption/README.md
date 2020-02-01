@@ -4,7 +4,7 @@ This script will enable S3 Bucket Default Encryption (using AWS Managed Keys) on
 
 ## Why?
 
-*Amazon S3 default encryption provides a way to set the default encryption behavior for an S3 bucket. You can set default encryption on a bucket so that all new objects are encrypted when they are stored in the bucket. The objects are encrypted using server-side encryption with either Amazon S3-managed keys (SSE-S3) or customer master keys (CMKs) stored in AWS Key Management Service (AWS KMS)* ([cite](https://docs.aws.amazon.com/AmazonS3/latest/dev/bucket-encryption.html)).
+*Amazon S3 default encryption provides a way to set the default encryption behavior for an S3 bucket. You can set default encryption on a bucket so that all new objects are encrypted when they are stored in the bucket. The objects are encrypted using server-side encryption with either Amazon S3-managed keys (SSE-S3) or customer master keys (CMKs) stored in AWS Key Management Service (AWS KMS)* ([source](https://docs.aws.amazon.com/AmazonS3/latest/dev/bucket-encryption.html)).
 
 
 ## What the script does.
@@ -33,7 +33,6 @@ optional arguments:
   --debug           print debugging info
   --error           print error info only
   --timestamp       Output log with timestamp and toolname
-  --region REGION   Only Process Specified Region
   --profile PROFILE  Use this CLI profile (instead of default or env credentials)
   --actually-do-it  Actually Perform the action
 ```

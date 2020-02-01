@@ -119,7 +119,6 @@ def do_args():
     parser.add_argument("--debug", help="print debugging info", action='store_true')
     parser.add_argument("--error", help="print error info only", action='store_true')
     parser.add_argument("--timestamp", help="Output log with timestamp and toolname", action='store_true')
-    parser.add_argument("--region", help="Only Process Specified Region")
     parser.add_argument("--profile", help="Use this CLI profile (instead of default or env credentials)")
     parser.add_argument("--actually-do-it", help="Actually Perform the action", action='store_true')
 
