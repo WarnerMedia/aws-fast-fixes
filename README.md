@@ -8,3 +8,4 @@ Scripts to quickly fix security and compliance issues
 * [Disable Inactive IAM Users](inactive-iam-users/README.md)
 * [Enable S3 Default Bucket Encryption](s3-bucket-default-encryption/README.md)
 * [Enable Default EBS Encryption](ebs-encryption/README.md)
+* [Enable GuardDuty](guardduty/README.md)
