@@ -9,3 +9,6 @@ Scripts to quickly fix security and compliance issues
 * [Enable S3 Default Bucket Encryption](s3-bucket-default-encryption/README.md)
 * [Enable Default EBS Encryption](ebs-encryption/README.md)
 * [Enable GuardDuty](guardduty/README.md)
+* [Enable Amazon S3 Block Public Access](s3-block-public-access/README.md)
+
+
