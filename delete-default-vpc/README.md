@@ -28,6 +28,7 @@ optional arguments:
   --timestamp           Output log with timestamp and toolname
   --profile PROFILE     Use this CLI profile (instead of default or env credentials)
   --region REGION       Only look for default VPCs in this region
+  --exclude-regions REGION1, REGION2  Do not attempt to delete default VPCs in these regions
   --vpc-id VPCID        Only delete the VPC specified (must match --region )
   --actually-do-it      Actually Perform the action (default behavior is to report on what would be done)
 
