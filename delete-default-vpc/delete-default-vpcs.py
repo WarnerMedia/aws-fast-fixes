@@ -29,6 +29,138 @@ def main(args, logger):
 
     return
 
+def delete_igw(vpc,logger):
+    for igw in vpc.internet_gateways.all():
+        logger.debug("Detaching {}, VPC:{}".format(igw.id,vpc.id))
+        igw.detach_from_vpc(VpcId=vpc.id)
+        logger.debug("Deleting {}, VPC:{}".format(igw.id,vpc.id))
+        igw.delete()
+
+def delete_eigw(vpc,logger):
+    client = vpc.meta.client
+    paginator = client.get_paginator('describe_egress_only_internet_gateways')
+    for page in paginator.paginate():
+        for eigw in page['EgressOnlyInternetGateways']:
+            for attachment in eigw['Attachments']:
+                if attachment['VpcId'] == vpc.id and attachment['State'] == 'attached':
+                    logger.debug("Deleting {}, VPC:{}".format(eigw['EgressOnlyInternetGatewayId'],vpc.id))
+                    client.delete_egress_only_internet_gateway(EgressOnlyInternetGatewayId=eigw['EgressOnlyInternetGatewayId'])
+                    break
+
+def delete_subnet(vpc,logger):
+    for subnet in vpc.subnets.all():
+        logger.debug("Deleting {}, VPC:{}".format(subnet.id,vpc.id))
+        subnet.delete()
+
+def delete_sg(vpc,logger):
+    for sg in filter(lambda x:x.group_name != 'default', vpc.security_groups.all()): #exclude default SG:
+        logger.debug("Deleting {}, VPC:{}".format(sg.id,vpc.id))
+        sg.delete()
+
+def delete_rtb(vpc,logger):
+    for rtb in vpc.route_tables.all():
+        rt_is_main = False
+        # skip deleting main route tables
+        for attr in rtb.associations_attribute:
+            if attr['Main']:
+                rt_is_main = True
+        if rt_is_main:
+            continue
+        logger.debug("Deleting {}, VPC:{}".format(rtb.id,vpc.id))
+        rtb.delete()
+
+def delete_acl(vpc,logger):
+    for acl in vpc.network_acls.all():
+        if acl.is_default:
+            # skip deleting default acl
+            continue
+        logger.debug("Deleting {}, VPC:{}".format(acl.id,vpc.id))
+        acl.delete()
+
+def delete_pcx(vpc,logger):
+    pcxs = list(vpc.accepted_vpc_peering_connections.all()) + list(vpc.requested_vpc_peering_connections.all())
+    for pcx in pcxs:
+        if pcx.status['Code'] == 'deleted':
+            # vpc peering connections already deleted
+            continue
+        logger.debug("Deleting {}, VPC:{}".format(pcx.status,vpc.id))
+        pcx.delete()
+
+def delete_endpoints(vpc,logger):
+    client = vpc.meta.client
+    paginator = client.get_paginator('describe_vpc_endpoints')
+    for page in paginator.paginate(Filters=[
+                    {'Name': 'vpc-id', 'Values': [vpc.id]},
+                    {'Name': 'vpc-endpoint-state', 'Values': ['pendingAcceptance', 'pending', 'available', 'rejected', 'failed']},
+                ]):
+        for endpoint in page['VpcEndpoints']:
+            logger.debug("Deleting {}, VPC:{}".format(endpoint['VpcEndpointId'],vpc.id))
+            client.delete_vpc_endpoints(VpcEndpointIds=[endpoint['VpcEndpointId']])
+
+def delete_cvpn_endpoint(vpc,logger):
+    client = vpc.meta.client
+    paginator = client.get_paginator('describe_client_vpn_endpoints')
+    for page in paginator.paginate():
+        for cvpn_endpoint in page['ClientVpnEndpoints']:
+            if cvpn_endpoint['VpcId'] == vpc.id:
+                logger.debug("Deleting {}, VPC:{}".format(cvpn_endpoint['ClientVpnEndpointId'],vpc.id))
+                client.delete_client_vpn_endpoint(ClientVpnEndpointId=[cvpn_endpoint['ClientVpnEndpointId']])
+
+def delete_vgw(vpc,logger):
+    client = vpc.meta.client
+    response = client.describe_vpn_gateways(Filters=[
+                    {'Name': 'attachment.vpc-id', 'Values': [vpc.id]},
+                    {'Name': 'state', 'Values': ['pending', 'available']},
+                ])
+    for vgw in response['VpnGateways']:
+        for attachment in vgw['VpcAttachments']:
+            if attachment['State'] in ['attaching','attached']:
+                logger.debug("Detaching {}, from VPC:{}".format(vgw['VpnGatewayId'],vpc.id))
+                client.detach_vpn_gateway(VpcId=vpc.id, VpnGatewayId=vgw['VpnGatewayId'])
+                break
+        response = client.describe_vpn_connections(Filters=[{'Name': 'vpn-gateway-id', 'Values': [vgw['VpnGatewayId']]}])
+        for vpn_connection in response['VpnConnections']:
+            if vpn_connection['State'] in ['pending','available']:
+                logger.debug("Deleting {}, from VPC:{}".format(vpn_connection['VpnConnectionId'],vpc.id))
+                client.delete_vpn_connection(VpnConnectionId=vpn_connection['VpnConnectionId'])
+        logger.debug("Deleting {}, VPC:{}".format(vgw['VpnGatewayId'],vpc.id))
+        client.delete_vpn_gateway(VpnGatewayId=vgw['VpnGatewayId'])
+
+def delete_vpc(vpc,logger,region,debug):
+    network_interfaces = list(vpc.network_interfaces.all())
+    if network_interfaces:
+        logger.warning("Elastic Network Interfaces exist in the VPC:{}, skipping delete".format(vpc.id))
+        if debug:
+            for eni in network_interfaces:
+                logger.debug("Interface:{} attached to {},  VPC:{}, region:{}".format(eni.id,eni.attachment,vpc.id,region))
+    else:
+        logger.debug("Deleting default VPC:{}, region:{}".format(vpc.id,region))
+        if args.actually_do_it:
+            try:
+                vpc_resources = {
+                    'internet_gateways': delete_igw,
+                    'egress_only_internet_gateways': delete_eigw,
+                    'subnets': delete_subnet,
+                    'route_tables': delete_rtb,
+                    'network_acls': delete_acl,
+                    'vpc_peering_connections': delete_pcx,
+                    'security_groups': delete_sg,
+                    'vpc_endpoints': delete_endpoints,
+                    # 'client_vpn_endpoints': delete_cvpn_endpoint, skip deleting because it use network interfaces
+                    'virtual_private_gateways': delete_vgw,
+                }
+                for resource_type in vpc_resources:
+                    vpc_resources[resource_type](vpc,logger)
+
+                vpc.delete()
+
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'DependencyViolation':
+                    logger.error("VPC:{} can't be delete due to dependency, {}".format(vpc.id, e))
+                else:
+                    raise
+        logger.info("Successfully deleted default VPC:{}, region:{}".format(vpc.id,region))
+
 def process_region(args, region, session, logger):
     logger.debug(f"Processing region {region}")
     ec2_resource = session.resource('ec2', region_name=region)
@@ -42,49 +174,7 @@ def process_region(args, region, session, logger):
             vpcs.append(vpc)
     if vpcs:
         for vpc in vpcs:
-            if list(vpc.network_interfaces.all()):
-                logger.warning("Elastic Network Interfaces exist in the VPC:{}, skipping delete".format(vpc.id))
-            else:
-                logger.debug("Deleting default VPC:{}, region:{}".format(vpc.id,region))
-                if args.actually_do_it:
-                    try:
-                        vpc_resources = {
-                            'internet_gateways': vpc.internet_gateways.all(),
-                            'subnets': vpc.subnets.all(),
-                            'route_tables': vpc.route_tables.all(),
-                            'network_acls': vpc.network_acls.all(),
-                            'accepted_vpc_peering_connections': vpc.accepted_vpc_peering_connections.all(),
-                            'requested_vpc_peering_connections': vpc.requested_vpc_peering_connections.all(),
-                            'security_groups': filter(lambda x:x.group_name != 'default', vpc.security_groups.all()), #exclude default SG
-                        }
-                        for resource_type in vpc_resources:
-                            for resource in vpc_resources[resource_type]:
-                                logger.debug("Deleting {}:{}, VPC:{}, region:{}".format(resource_type,resource.id,vpc.id,region))
-                                if resource.id.startswith('igw'):
-                                    # detach IGW from VPC
-                                    resource.detach_from_vpc(VpcId=vpc.id)
-                                elif resource.id.startswith('rtb'):
-                                    rt_is_main = False
-                                    # skip deleting main route tables
-                                    for attr in resource.associations_attribute:
-                                        if attr['Main']:
-                                            rt_is_main = True
-                                    if rt_is_main:
-                                        continue
-                                elif resource.id.startswith('acl'):
-                                    if resource.is_default:
-                                        # skip deleting default acl
-                                        continue
-
-                                resource.delete()
-                        vpc.delete()
-
-                    except ClientError as e:
-                        if e.response['Error']['Code'] == 'DependencyViolation':
-                            logger.error("VPC:{} can't be delete due to dependency, {}".format(vpc.id, e))
-                        else:
-                            raise
-                logger.info("Successfully deleted default VPC:{}, region:{}".format(vpc.id,region))
+            delete_vpc(vpc,logger,region,args.debug)
     else:
         logger.debug("No Default VPC to to be deleted in region:{}".format(region))
 
