@@ -7,10 +7,6 @@ import os
 import logging
 # logger = logging.getLogger()
 
-services = {
-    "access-analyzer.amazonaws.com": "IAM Access Analyzer",
-    # "guardduty.amazonaws.com": "AWS GuardDuty",  # apparently this isn't a proper
-}
 
 
 def main(args, logger):
@@ -22,27 +18,43 @@ def main(args, logger):
     else:
         session = boto3.Session()
 
-    org_client = session.client("organizations")
-
-    for service, description in services.items():
-
-        response = org_client.list_delegated_administrators(ServicePrincipal=service)
-        if len(response['DelegatedAdministrators']) == 1:
-            if response['DelegatedAdministrators'][0]['Id'] == args.accountId:
-                logger.info(f"{args.accountId} is already the delegated admin for {description}")
+    # GuardDuty needs to be enabled Regionally. Gah!
+    for r in get_regions(session, args):
+        guardduty_client = session.client("guardduty", region_name=r)
+        response = guardduty_client.list_organization_admin_accounts()
+        if len(response['AdminAccounts']) > 1:
+            logger.error(f"too many admin accounts in region {r}. Cannot proceed.")
+        elif len(response['AdminAccounts']) == 1:
+            if response['AdminAccounts'][0]['AdminAccountId'] == args.accountId:
+                logger.debug(f"Account {args.accountId} is already the delegated admin for region {r} and in state {response['AdminAccounts'][0]['AdminStatus']}")
             else:
-                logger.error(f"{response['DelegatedAdministrators'][0]['Id']} is the delegated admin for {service}. Not performing the update")
-        elif len(response['DelegatedAdministrators']) > 1:
-            logger.error(f"Multiple delegated admin accounts for {service}. Cannot safely proceed.")
+                logger.error(f"{response['AdminAccounts'][0]['AdminAccountId']} is already the delegated admin in {r}. Not performing update")
         elif args.actually_do_it is True:
-            # Safe to Proceed
-            logger.info(f"Enabling {description} Delegation to {args.accountId}")
-            response = org_client.register_delegated_administrator(
-                AccountId=args.accountId,
-                ServicePrincipal=service
-            )
+            try:
+                logger.info(f"Enablng GuardDuty Delegated Admin to {args.accountId} in region {r}")
+                guardduty_client.enable_organization_admin_account(AdminAccountId=args.accountId)
+            except ClientError as e:
+                logger.critical(e)
         else:
-            logger.info(f"Would enable {description} Delegation to {args.accountId}")
+            logger.info(f"Would enable GuardDuty Delegated Admin to {args.accountId} in region {r}")
+
+def get_regions(session, args):
+    '''Return a list of regions with us-east-1 first. If --region was specified, return a list wth just that'''
+
+    # If we specifed a region on the CLI, return a list of just that
+    if args.region:
+        return([args.region])
+
+    # otherwise return all the regions, us-east-1 first
+    ec2 = session.client('ec2')
+    response = ec2.describe_regions()
+    output = ['us-east-1']
+    for r in response['Regions']:
+        # return us-east-1 first, but dont return it twice
+        if r['RegionName'] == "us-east-1":
+            continue
+        output.append(r['RegionName'])
+    return(output)
 
 def do_args():
     import argparse
@@ -65,7 +77,7 @@ if __name__ == '__main__':
 
     # Logging idea stolen from: https://docs.python.org/3/howto/logging.html#configuring-logging
     # create console handler and set level to debug
-    logger = logging.getLogger('delegated-admin')
+    logger = logging.getLogger('enable-guardduty')
     ch = logging.StreamHandler()
     if args.debug:
         logger.setLevel(logging.DEBUG)
