@@ -36,10 +36,6 @@ def process_region(args, region, session, logger):
             else:
                 vpcs.append(vpc['VpcId'])
     if vpcs:
-        # checking for existing log bucket
-        s3_client = session.client('s3', region_name=region)
-        bucket_name = '{}-{}'.format(args.flowlog_bucket_prefix,region)
-
         # processing VPCs
         for VpcId in vpcs:
             logger.debug(f"   Processing VpcId {VpcId}")
@@ -79,7 +75,7 @@ def enable_flowlogs(VpcId,client,args,region):
         response = client.create_flow_logs(
             ResourceIds=[VpcId],
             ResourceType='VPC',
-            TrafficType='ALL',
+            TrafficType=args.traffic_type,
             LogDestinationType='s3',
             LogDestination=bucket
         )
