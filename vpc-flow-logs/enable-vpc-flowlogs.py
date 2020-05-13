@@ -3,9 +3,6 @@
 import boto3
 from botocore.exceptions import ClientError
 import logging
-import concurrent.futures
-
-max_workers = 10
 
 def main(args, logger):
     '''Executes the Primary Logic'''
@@ -20,12 +17,8 @@ def main(args, logger):
     all_regions = get_regions(session, args)
 
     # processiong regions
-    futures = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        for region in all_regions:
-            futures.append(executor.submit(process_region, args, region, session, logger))
-    for future in futures:
-        future.result()
+    for region in all_regions:
+        process_region(args, region, session, logger)
 
     return
 
@@ -46,26 +39,12 @@ def process_region(args, region, session, logger):
         # checking for existing log bucket
         s3_client = session.client('s3', region_name=region)
         bucket_name = '{}-{}'.format(args.flowlog_bucket_prefix,region)
-        try:
-            s3_client.head_bucket(Bucket=bucket_name)
-        except ClientError as e:
-            if e.response['Error']['Code'] == '403':
-                logger.error("Unable access bucket {}: AccessDenied".format(bucket_name))
-            elif e.response['Error']['Code'] == '404':
-                logger.error("Log bucket {} does not exist".format(bucket_name))
-            else:
-                raise
-            return
 
         # processing VPCs
-        futures = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            for VpcId in vpcs:
-                logger.debug(f"   Processing VpcId {VpcId}")
-                futures.append(executor.submit(enable_flowlogs, VpcId, ec2_client, args, region))
+        for VpcId in vpcs:
+            logger.debug(f"   Processing VpcId {VpcId}")
+            enable_flowlogs(VpcId, ec2_client, args, region)
 
-        for future in futures:
-            future.result()
     else:
         logger.debug("No VPCs to enable flow logs in region:{}".format(region))
 
@@ -74,7 +53,6 @@ def process_region(args, region, session, logger):
 def enable_flowlogs(VpcId,client,args,region):
     # checking for existing flow logs
     bucket = 'arn:aws:s3:::{}-{}'.format(args.flowlog_bucket_prefix,region)
-    flow_logs_exist = False
     paginator = client.get_paginator('describe_flow_logs')
     for page in paginator.paginate(
             Filters=[
@@ -91,12 +69,12 @@ def enable_flowlogs(VpcId,client,args,region):
         for FlowLog in page['FlowLogs']:
             if FlowLog['LogDestination'] == bucket:
                 logger.info("Flow Log ({}) already exist, region:{}, VPC:{}".format(FlowLog['FlowLogId'],region,VpcId))
-                flow_logs_exist = True
                 if FlowLog['DeliverLogsStatus'] == 'FAILED':
                     logger.error("Flow Log ({}) failed, region:{}, VPC:{}, please check it".format(FlowLog['FlowLogId'],region,VpcId))
+                return
 
     # creating flow logs
-    if args.actually_do_it and not flow_logs_exist:
+    if args.actually_do_it:
         logger.info("enabling Flow Log region:{}, VPC:{}".format(region,VpcId))
         response = client.create_flow_logs(
             ResourceIds=[VpcId],
@@ -112,6 +90,8 @@ def enable_flowlogs(VpcId,client,args,region):
                     logger.error("Flow Log creation failed, error:{}".format(unsuccess['Error'].get('Message')))
         elif response.get('FlowLogIds'):
             logger.info("Successfully created Flow Logs:{}, region:{}, VPC:{}".format(response['FlowLogIds'][0],region,VpcId))
+    else:
+        logger.info("Would Enable Flow Logs")
 
     return
 
@@ -145,6 +125,7 @@ def do_args():
     parser.add_argument("--vpc-id", help="Only Process Specified VPC")
     parser.add_argument("--actually-do-it", help="Actually Perform the action", action='store_true')
     parser.add_argument("--flowlog-bucket-prefix", help="S3 bucket to deposit logs to", required=True)
+    parser.add_argument("--traffic-type", help="The type of traffic to log", default='ALL', choices=['ACCEPT','REJECT','ALL'])
 
     args = parser.parse_args()
 
