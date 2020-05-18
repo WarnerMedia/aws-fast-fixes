@@ -23,7 +23,7 @@ def main(args, logger):
     return
 
 def process_region(args, region, session, logger):
-    logger.debug(f"Processing region {region}")
+    logger.info(f"Processing region {region}")
     ec2_client = session.client('ec2', region_name=region)
 
     vpcs = []
@@ -64,14 +64,14 @@ def enable_flowlogs(VpcId,client,args,region):
         ):
         for FlowLog in page['FlowLogs']:
             if FlowLog['LogDestination'] == bucket:
-                logger.info("Flow Log ({}) already exist, region:{}, VPC:{}".format(FlowLog['FlowLogId'],region,VpcId))
+                logger.debug("Flow Log ({}) already exist, region:{}, VPC:{}".format(FlowLog['FlowLogId'],region,VpcId))
                 if FlowLog['DeliverLogsStatus'] == 'FAILED':
                     logger.error("Flow Log ({}) failed, region:{}, VPC:{}, please check it".format(FlowLog['FlowLogId'],region,VpcId))
                 return
 
     # creating flow logs
     if args.actually_do_it:
-        logger.info("enabling Flow Log region:{}, VPC:{}".format(region,VpcId))
+        logger.debug("enabling Flow Log region:{}, VPC:{}".format(region,VpcId))
         response = client.create_flow_logs(
             ResourceIds=[VpcId],
             ResourceType='VPC',
@@ -87,7 +87,7 @@ def enable_flowlogs(VpcId,client,args,region):
         elif response.get('FlowLogIds'):
             logger.info("Successfully created Flow Logs:{}, region:{}, VPC:{}".format(response['FlowLogIds'][0],region,VpcId))
     else:
-        logger.info("Would Enable Flow Logs")
+        logger.info("Would Enable Flow Log region:{}, VPC:{}".format(region,VpcId)")
 
     return
 

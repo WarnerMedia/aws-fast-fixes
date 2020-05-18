@@ -4,7 +4,7 @@ This script will enable vpc flow logs in your account.
 
 ## Why?
 
-VPC Flow Logs is a feature that enables you to capture information about the IP traffic going to and from network interfaces in your VPC. Flow log data can be published to Amazon CloudWatch Logs or Amazon S3. After you've created a flow log, you can retrieve and view its data in the chosen destination. 
+VPC Flow Logs is a feature that enables you to capture information about the IP traffic going to and from network interfaces in your VPC. Flowlogs will be delivered to the S3 bucket specified by the value of --flowlog-bucket-prefix with the region appended to the end. It is assumed the S3 Bucket exists and is configured to allow the log service to write to it. After you've created a flow log, you can retrieve and view its data in the chosen destination. 
 
 ## What the script does.
 
