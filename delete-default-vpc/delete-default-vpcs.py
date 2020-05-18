@@ -133,21 +133,26 @@ def delete_vpc(vpc,logger,region,debug):
         if debug:
             for eni in network_interfaces:
                 logger.debug("Interface:{} attached to {},  VPC:{}, region:{}".format(eni.id,eni.attachment,vpc.id,region))
+        return
     else:
-        logger.debug("Deleting default VPC:{}, region:{}".format(vpc.id,region))
+        logger.info("Deleting default VPC:{}, region:{}".format(vpc.id,region))
         if args.actually_do_it:
             try:
                 vpc_resources = {
+                    # dependency order from https://aws.amazon.com/premiumsupport/knowledge-center/troubleshoot-dependency-error-delete-vpc/
                     'internet_gateways': delete_igw,
                     'egress_only_internet_gateways': delete_eigw,
                     'subnets': delete_subnet,
                     'route_tables': delete_rtb,
                     'network_acls': delete_acl,
                     'vpc_peering_connections': delete_pcx,
-                    'security_groups': delete_sg,
                     'vpc_endpoints': delete_endpoints,
+                    # nat gateways (we do not delete this for safety)
+                    'security_groups': delete_sg,
+                    # instances (we do not delete this for safety)
                     # 'client_vpn_endpoints': delete_cvpn_endpoint, skip deleting because it use network interfaces
                     'virtual_private_gateways': delete_vgw,
+                    # network interfaces (we do not delete this for safety)
                 }
                 for resource_type in vpc_resources:
                     vpc_resources[resource_type](vpc,logger)
@@ -159,10 +164,13 @@ def delete_vpc(vpc,logger,region,debug):
                     logger.error("VPC:{} can't be delete due to dependency, {}".format(vpc.id, e))
                 else:
                     raise
-        logger.info("Successfully deleted default VPC:{}, region:{}".format(vpc.id,region))
+
+            logger.info("Successfully deleted default VPC:{}, region:{}".format(vpc.id,region))
+        if not args.actually_do_it:
+            logger.info("Would delete default VPC:{}, region:{}".format(vpc.id,region))
 
 def process_region(args, region, session, logger):
-    logger.debug(f"Processing region {region}")
+    logger.info(f"Processing region {region}")
     ec2_resource = session.resource('ec2', region_name=region)
 
     vpcs = []
