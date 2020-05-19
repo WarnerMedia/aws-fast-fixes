@@ -13,7 +13,7 @@ This script will iterate through all your regions, through all VPCs in each regi
 ## Usage
 
 ```bash
-usage: enable-vpc-flowlogs.py [-h] [--debug] [--error] [--timestamp] [--region REGION] [--profile PROFILE] [--vpc-id VPC_ID] [--actually-do-it] --flowlog-bucket-prefix FLOWLOG_BUCKET_PREFIX
+usage: enable-vpc-flowlogs.py [-h] [--debug] [--error] [--timestamp] [--region REGION] [--profile PROFILE] [--vpc-id VPC_ID] [--actually-do-it] --flowlog-bucket FLOWLOG_BUCKET_PREFIX
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -21,10 +21,10 @@ optional arguments:
   --error               print error info only
   --timestamp           Output log with timestamp and toolname
   --region REGION       Only Process Specified Region
-  --profile PROFILE     Use this CLI profile (instead of default or env credentials)
+  --profile PROFILE      Use this CLI profile (instead of default or env credentials)
   --vpc-id VPC_ID       Only Process Specified VPC
   --actually-do-it      Actually Perform the action
-  --flowlog-bucket-prefix FLOWLOG_BUCKET_PREFIX S3 bucket to deposit logs to
+  --flowlog-bucket       FLOWLOG_BUCKET_PREFIX S3 bucket to deposit logs to
 ```
 
 You must specify `--actually-do-it` for the changes to be made. Otherwise the script runs in dry-run mode only.

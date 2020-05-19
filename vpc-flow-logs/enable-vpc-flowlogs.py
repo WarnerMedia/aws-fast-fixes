@@ -48,7 +48,7 @@ def process_region(args, region, session, logger):
 
 def enable_flowlogs(VpcId,client,args,region):
     # checking for existing flow logs
-    bucket = 'arn:aws:s3:::{}-{}'.format(args.flowlog_bucket_prefix,region)
+    bucket = 'arn:aws:s3:::{}'.format(args.flowlog_bucket)
     paginator = client.get_paginator('describe_flow_logs')
     for page in paginator.paginate(
             Filters=[
@@ -120,7 +120,7 @@ def do_args():
     parser.add_argument("--profile", help="Use this CLI profile (instead of default or env credentials)")
     parser.add_argument("--vpc-id", help="Only Process Specified VPC")
     parser.add_argument("--actually-do-it", help="Actually Perform the action", action='store_true')
-    parser.add_argument("--flowlog-bucket-prefix", help="S3 bucket to deposit logs to", required=True)
+    parser.add_argument("--flowlog-bucket", help="S3 bucket to deposit logs to", required=True)
     parser.add_argument("--traffic-type", help="The type of traffic to log", default='ALL', choices=['ACCEPT','REJECT','ALL'])
 
     args = parser.parse_args()
