@@ -3,7 +3,6 @@
 import boto3
 from botocore.exceptions import ClientError
 import logging
-import concurrent.futures
 
 max_workers = 10
 
@@ -20,12 +19,8 @@ def main(args, logger):
     all_regions = get_regions(session, args)
 
     # processiong regions
-    futures = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        for region in all_regions:
-            futures.append(executor.submit(process_region, args, region, session, logger))
-    for future in futures:
-        future.result()
+    for region in all_regions:
+        process_region(args, region, session, logger)
 
     return
 
@@ -175,6 +170,7 @@ def process_region(args, region, session, logger):
 
     vpcs = []
     for vpc in ec2_resource.vpcs.filter(Filters=[{'Name': 'isDefault', 'Values': ['true']}]):
+        logger.debug(f'Found {vpc}')
         if args.vpc_id:
             if args.vpc_id == vpc.id:
                 vpcs.append(vpc)
