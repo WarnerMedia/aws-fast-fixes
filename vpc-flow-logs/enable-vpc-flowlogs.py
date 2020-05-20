@@ -39,7 +39,7 @@ def process_region(args, region, session, logger):
         for VpcId in vpcs:
             # enable flowlogs if the vpc has eni within it
             logger.debug(f"   Processing VpcId {VpcId}")
-            network_interfaces = ec2_client.describe_network_interfaces(Filters=[{'Name':'vpc-id','Values':[VpcId]}])['NetworkInterfaces'])
+            network_interfaces = ec2_client.describe_network_interfaces(Filters=[{'Name':'vpc-id','Values':[VpcId]}])['NetworkInterfaces']
             if network_interfaces:
                 logger.debug(f"   ENI found in VpcId {VpcId}")
                 enable_flowlogs(VpcId, ec2_client, args, region)
@@ -49,6 +49,7 @@ def process_region(args, region, session, logger):
         logger.debug("No VPCs to enable flow logs in region:{}".format(region))
 
     return
+
 
 def enable_flowlogs(VpcId,client,args,region):
     # checking for existing flow logs
@@ -69,22 +70,61 @@ def enable_flowlogs(VpcId,client,args,region):
         
         for FlowLog in page['FlowLogs']:
             if FlowLog['LogDestination'] == bucket:
-                logger.debug("Flow Log ({}) already exist, region:{}, VPC:{}".format(FlowLog['FlowLogId'],region,VpcId))
+                accept_destructive_update=False
+
+                logger.debug("   Flow Log ({}) already exist, region:{}, VPC:{}".format(FlowLog['FlowLogId'],region,VpcId))
                 if FlowLog['DeliverLogsStatus'] == 'FAILED':
                     logger.error("Flow Log ({}) failed, region:{}, VPC:{}, please check it".format(FlowLog['FlowLogId'],region,VpcId))
-                print(f'Flow Log exists, :')
+                    return
 
-                print(f'flowlog details')
-                print(f'print new flowlog')
-                input(f'do you wish to continue?')
+                logger.info("Flow Log ({}) is {} on {}\n   traffic type: {}\n   destination type: {}\n   destination: {}\n   log format: \n   {}".format(
+                    FlowLog['FlowLogId'],
+                    FlowLog['FlowLogStatus'],
+                    FlowLog['ResourceId'],
+                    FlowLog['TrafficType'],
+                    FlowLog['LogDestinationType'],
+                    FlowLog['LogDestination'],
+                    FlowLog['LogFormat']
+                ))
+                
+                difflist = []
+                if FlowLog['TrafficType'] != args.traffic_type:
+                    difflist.append("Traffic type will change from {} to {}.".format(FlowLog['TrafficType'],args.traffic_type))
+                if FlowLog['LogDestination'] != bucket:
+                    difflist.append("Log Destination will change from {} to {}.".format(FlowLog['LogDestination'],bucket))
+                logger.info("Existing flow log will be terminated and new flow log created with these changes:\n\n{}\n".format(difflist))
+                
+                accept_destructive_update = input(f'Do you wish to continue? [y/N] ').lower()
+                if accept_destructive_update[:1] == 'y':
+                    delete_flowlog(VpcId,FlowLog['FlowLogId'],True,client,args,region)
+                    create_flowlog(VpcId,bucket,client,args,region)
+                else:
+                    logger.info("User declined replacement of flow log {}".format(FlowLog['FlowLogId']))
+            else:
+                create_flowlog(VpcId,bucket,client,args,region)
 
-                return
+    return
 
-    
+def delete_flowlog(VpcId, FlowLogId, actually_do_it, client, args, region):
+    if args.actually_do_it:
+        logger.debug("   deleting Flow Log:{}, region:{}, VPC:{}".format(FlowLogId,region,VpcId))
+        response = client.delete_flow_logs(
+             DryRun=not actually_do_it,
+             FlowLogIds=[FlowLogId]
+        )
+        if response.get('Unsuccessful'):
+            for failure in response['Unsuccessful']:
+                if failure.get('Error'):
+                    logger.error("Flow Log deletion failed, error:{}".format(failure['Error'].get('Message')))
+        else:
+            logger.info("Successfully deleted Flow Log:{}, region:{}, VPC:{}".format(FlowLogId,region,VpcId))
+    else:
+        logger.info("Would delete Flow Log:{}, region:{}, VPC:{}".format(FlowLogId,region,VpcId))
+    return
 
-
+def create_flowlog(VpcId,bucket,client,args,region):
     # creating flow logs
-    if args.actually_do_it and accept_destructive_update:
+    if args.actually_do_it:
         logger.debug("enabling Flow Log region:{}, VPC:{}".format(region,VpcId))
         response = client.create_flow_logs(
             ResourceIds=[VpcId],
@@ -102,7 +142,6 @@ def enable_flowlogs(VpcId,client,args,region):
             logger.info("Successfully created Flow Logs:{}, region:{}, VPC:{}".format(response['FlowLogIds'][0],region,VpcId))
     else:
         logger.info("Would Enable Flow Log region:{}, VPC:{}".format(region,VpcId))
-
     return
 
 def get_regions(session, args):
