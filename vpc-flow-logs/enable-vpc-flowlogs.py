@@ -46,7 +46,7 @@ def process_region(args, region, session, logger):
             else:
                 logger.debug(f"   No ENI found in VpcId {VpcId}, skipped.")
     else:
-        logger.debug("No VPCs to enable flow logs in region:{}".format(region))
+        logger.debug("   No VPCs to enable flow logs in region:{}".format(region))
 
     return
 
@@ -94,7 +94,10 @@ def enable_flowlogs(VpcId,client,args,region):
                     difflist.append("Log Destination will change from {} to {}.".format(FlowLog['LogDestination'],bucket))
                 logger.info("Existing flow log will be terminated and new flow log created with these changes:\n\n{}\n".format(difflist))
                 
-                accept_destructive_update = input(f'Do you wish to continue? [y/N] ').lower()
+                if args.force:
+                    accept_destructive_update='y'
+                else:    
+                    accept_destructive_update = input(f'Do you wish to continue? [y/N] ').lower()
                 if accept_destructive_update[:1] == 'y':
                     delete_flowlog(VpcId,FlowLog['FlowLogId'],True,client,args,region)
                     create_flowlog(VpcId,bucket,client,args,region)
@@ -175,6 +178,7 @@ def do_args():
     parser.add_argument("--actually-do-it", help="Actually Perform the action", action='store_true')
     parser.add_argument("--flowlog-bucket", help="S3 bucket to deposit logs to", required=True)
     parser.add_argument("--traffic-type", help="The type of traffic to log", default='ALL', choices=['ACCEPT','REJECT','ALL'])
+    parser.add_argument("--force", help="Perform flowlog replacement without prompt", action='store_true')
 
     args = parser.parse_args()
 
