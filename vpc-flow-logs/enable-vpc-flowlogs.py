@@ -25,7 +25,6 @@ def main(args, logger):
 def process_region(args, region, session, logger):
     logger.info(f"Processing region {region}")
     ec2_client = session.client('ec2', region_name=region)
-
     vpcs = []
     paginator = ec2_client.get_paginator('describe_vpcs')
     for page in paginator.paginate():
@@ -38,9 +37,14 @@ def process_region(args, region, session, logger):
     if vpcs:
         # processing VPCs
         for VpcId in vpcs:
+            # enable flowlogs if the vpc has eni within it
             logger.debug(f"   Processing VpcId {VpcId}")
-            enable_flowlogs(VpcId, ec2_client, args, region)
-
+            network_interfaces = ec2_client.describe_network_interfaces(Filters=[{'Name':'vpc-id','Values':[VpcId]}])['NetworkInterfaces'])
+            if network_interfaces:
+                logger.debug(f"   ENI found in VpcId {VpcId}")
+                enable_flowlogs(VpcId, ec2_client, args, region)
+            else:
+                logger.debug(f"   No ENI found in VpcId {VpcId}, skipped.")
     else:
         logger.debug("No VPCs to enable flow logs in region:{}".format(region))
 
@@ -62,15 +66,25 @@ def enable_flowlogs(VpcId,client,args,region):
                 }
             ]
         ):
+        
         for FlowLog in page['FlowLogs']:
             if FlowLog['LogDestination'] == bucket:
                 logger.debug("Flow Log ({}) already exist, region:{}, VPC:{}".format(FlowLog['FlowLogId'],region,VpcId))
                 if FlowLog['DeliverLogsStatus'] == 'FAILED':
                     logger.error("Flow Log ({}) failed, region:{}, VPC:{}, please check it".format(FlowLog['FlowLogId'],region,VpcId))
+                print(f'Flow Log exists, :')
+
+                print(f'flowlog details')
+                print(f'print new flowlog')
+                input(f'do you wish to continue?')
+
                 return
 
+    
+
+
     # creating flow logs
-    if args.actually_do_it:
+    if args.actually_do_it and accept_destructive_update:
         logger.debug("enabling Flow Log region:{}, VPC:{}".format(region,VpcId))
         response = client.create_flow_logs(
             ResourceIds=[VpcId],
@@ -87,7 +101,7 @@ def enable_flowlogs(VpcId,client,args,region):
         elif response.get('FlowLogIds'):
             logger.info("Successfully created Flow Logs:{}, region:{}, VPC:{}".format(response['FlowLogIds'][0],region,VpcId))
     else:
-        logger.info("Would Enable Flow Log region:{}, VPC:{}".format(region,VpcId)")
+        logger.info("Would Enable Flow Log region:{}, VPC:{}".format(region,VpcId))
 
     return
 

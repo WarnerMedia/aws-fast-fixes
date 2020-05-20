@@ -29,6 +29,16 @@ optional arguments:
 
 You must specify `--actually-do-it` for the changes to be made. Otherwise the script runs in dry-run mode only.
 
+> Cross region note:
+> 
+> We assume the use of regions that allow cross-region log delivery. This tool does not support opt-in regions as defined here: https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs.html  
+> Excerpt:
+> 
+>     ```
+>     If you create a flow log in a Region introduced after March 20, 2019 (an opt-in Region), such as Asia Pacific (Hong Kong) or Middle East (Bahrain), the destination Amazon S3 bucket must be in the same Region and the same AWS account as the flow log.
+>     
+>     If you create a flow log in a Region introduced before March 20, 2019, the destination Amazon S3 bucket must be in the same Region as the flow log, or in another Region introduced before March 20, 2019. You cannot specify an Amazon S3 bucket that's in an opt-in Region.
+>     ```
 
 ## AWS Docs
 
