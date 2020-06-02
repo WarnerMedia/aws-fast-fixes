@@ -55,6 +55,7 @@ def enable_flowlogs(VpcId,client,args,region):
     # checking for existing flow logs
     bucket = 'arn:aws:s3:::{}'.format(args.flowlog_bucket)
     paginator = client.get_paginator('describe_flow_logs')
+    found = False
     for page in paginator.paginate(
             Filters=[
                 {
@@ -71,7 +72,7 @@ def enable_flowlogs(VpcId,client,args,region):
         for FlowLog in page['FlowLogs']:
             if FlowLog['LogDestination'] == bucket:
                 accept_destructive_update=False
-
+                found = True
                 logger.debug("   Flow Log ({}) already exist, region:{}, VPC:{}".format(FlowLog['FlowLogId'],region,VpcId))
                 if FlowLog['DeliverLogsStatus'] == 'FAILED':
                     logger.error("Flow Log ({}) failed, region:{}, VPC:{}, please check it".format(FlowLog['FlowLogId'],region,VpcId))
@@ -108,8 +109,8 @@ def enable_flowlogs(VpcId,client,args,region):
                     create_flowlog(VpcId,bucket,client,args,region)
                 else:
                     logger.info("User declined replacement of flow log {}".format(FlowLog['FlowLogId']))
-            else:
-                create_flowlog(VpcId,bucket,client,args,region)
+    if found == False:
+        create_flowlog(VpcId,bucket,client,args,region)
 
     return
 
