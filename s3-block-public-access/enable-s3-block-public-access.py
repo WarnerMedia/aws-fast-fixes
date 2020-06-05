@@ -68,7 +68,7 @@ def fix_bucket(s3_client, bucket, args, f=None):
         command += f"aws s3api put-public-access-block --bucket {bucket} "
         command += "--public-access-block-configuration BlockPublicAcls=True,IgnorePublicAcls=True,BlockPublicPolicy=True,RestrictPublicBuckets=True"
         if args.profile:
-            comand += f"--profile {arg.profile}"
+            command += f"--profile {args.profile}"
         command += "\n"
         f.write(command)
     else:
