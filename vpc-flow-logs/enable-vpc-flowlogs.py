@@ -63,9 +63,16 @@ def get_or_create_flowlog_bucket(session,args,region):
         if args.actually_do_it:
             logger.debug("creating Flow Log Bucket arn:aws:s3:::{}".format(bucket_name))
             s3 = session.resource('s3', region_name=region)
-            response = s3.create_bucket(Bucket=bucket_name)
-            bucket = 'arn:aws:s3:::{}'.format(response.name)
-            logger.info("created Flow Log Bucket {}".format(bucket))
+            try:
+                s3.meta.client.head_bucket(Bucket=bucket_name)
+                bucket = "arn:aws:s3:::{}".format(bucket_name)
+            except ClientError as e:
+                if e.response['Error']['Code'] == '404':
+                    response = s3.create_bucket(Bucket=bucket_name)
+                    bucket = 'arn:aws:s3:::{}'.format(response.name)
+                    logger.info("created Flow Log Bucket {}".format(bucket))
+                else:
+                    logger.error('Error accessing s3 bucket: {}'.format(e))
         else:
             logger.info("Would create bucket: {}".format(bucket_name))
     else:
