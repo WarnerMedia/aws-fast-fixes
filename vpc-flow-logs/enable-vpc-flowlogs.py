@@ -43,7 +43,7 @@ def process_region(args, region, session, logger):
             network_interfaces = ec2_client.describe_network_interfaces(Filters=[{'Name':'vpc-id','Values':[VpcId]}])['NetworkInterfaces']
             if network_interfaces:
                 logger.debug(f"   ENI found in VpcId {VpcId}")
-                enable_flowlogs(VpcId, ec2_client, session, args, region)
+                enable_flowlogs(VpcId, ec2_client, args, region)
             else:
                 logger.debug(f"   No ENI found in VpcId {VpcId}, skipped.")
     else:
@@ -51,9 +51,9 @@ def process_region(args, region, session, logger):
 
     return
 
-def enable_flowlogs(VpcId,client,session,args,region):
+def enable_flowlogs(VpcId,client,args,region):
     # checking for existing flow logs
-    bucket = args.flowlog_bucket
+    bucket = f'arn:aws:s3:::{args.flowlog_bucket}'
     paginator = client.get_paginator('describe_flow_logs')
     logs = paginator.paginate(
             Filters=[
