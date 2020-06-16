@@ -4,7 +4,6 @@ import boto3
 from botocore.exceptions import ClientError
 from collections import defaultdict
 import logging
-import pprint as pp
 
 def main(args, logger):
     '''Executes the Primary Logic'''
