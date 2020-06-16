@@ -2,7 +2,9 @@
 
 import boto3
 from botocore.exceptions import ClientError
+from collections import defaultdict
 import logging
+import pprint as pp
 
 def main(args, logger):
     '''Executes the Primary Logic'''
@@ -42,7 +44,7 @@ def process_region(args, region, session, logger):
             network_interfaces = ec2_client.describe_network_interfaces(Filters=[{'Name':'vpc-id','Values':[VpcId]}])['NetworkInterfaces']
             if network_interfaces:
                 logger.debug(f"   ENI found in VpcId {VpcId}")
-                enable_flowlogs(VpcId, ec2_client, args, region)
+                enable_flowlogs(VpcId, ec2_client, session, args, region)
             else:
                 logger.debug(f"   No ENI found in VpcId {VpcId}, skipped.")
     else:
@@ -50,12 +52,33 @@ def process_region(args, region, session, logger):
 
     return
 
+def get_or_create_flowlog_bucket(session,args,region):
+    # idempotent call to create bucket if it does not exist
+    bucket = ''
+    if args.flowlog_bucket:
+        bucket = 'arn:aws:s3:::{}'.format(args.flowlog_bucket)
+    elif args.make_bucket:
+        account_id = session.client('sts', region_name=region).get_caller_identity().get('Account')
+        bucket_name = 'wmcso-{}-flowlog-bucket'.format(account_id)
+        if args.actually_do_it:
+            logger.debug("creating Flow Log Bucket arn:aws:s3:::{}".format(bucket_name))
+            s3 = session.resource('s3', region_name=region)
+            response = s3.create_bucket(Bucket=bucket_name)
+            bucket = 'arn:aws:s3:::{}'.format(response.name)
+            logger.info("created Flow Log Bucket {}".format(bucket))
+        else:
+            logger.info("Would create bucket: {}".format(bucket_name))
+    else:
+        logger.error("Must supply --flowlog-bucket or select --make-bucket")
+        return
+    
+    return bucket
 
-def enable_flowlogs(VpcId,client,args,region):
+def enable_flowlogs(VpcId,client,session,args,region):
     # checking for existing flow logs
-    bucket = 'arn:aws:s3:::{}'.format(args.flowlog_bucket)
+    bucket = get_or_create_flowlog_bucket(session,args,region)
     paginator = client.get_paginator('describe_flow_logs')
-    for page in paginator.paginate(
+    logs = paginator.paginate(
             Filters=[
                 {
                     'Name': 'resource-id',
@@ -66,39 +89,31 @@ def enable_flowlogs(VpcId,client,args,region):
                     'Values': ['s3']
                 }
             ]
-        ):
-
-        for FlowLog in page['FlowLogs']:
-            if FlowLog['LogDestination'] == bucket:
+        ).search('FlowLogs[]')
+    logs_by_vpc = defaultdict(list)
+    for flow in logs:
+        logs_by_vpc[flow['ResourceId']].append(flow)
+    if not logs_by_vpc:
+        create_flowlog(VpcId,bucket,client,args,region)        
+    else:
+        for vpc, flow_logs in logs_by_vpc.items():
+            if any(log['LogDestination'] == bucket for log in flow_logs):
+                FlowLog = [log for log in flow_logs if log['LogDestination'] == bucket][0]
                 accept_destructive_update=False
-
                 logger.debug("   Flow Log ({}) already exist, region:{}, VPC:{}".format(FlowLog['FlowLogId'],region,VpcId))
                 if FlowLog['DeliverLogsStatus'] == 'FAILED':
                     logger.error("Flow Log ({}) failed, region:{}, VPC:{}, please check it".format(FlowLog['FlowLogId'],region,VpcId))
                     return
-
-                logger.debug("Flow Log ({}) is {} on {}\n   traffic type: {}\n   destination type: {}\n   destination: {}\n   log format: \n   {}".format(
-                    FlowLog['FlowLogId'],
-                    FlowLog['FlowLogStatus'],
-                    FlowLog['ResourceId'],
-                    FlowLog['TrafficType'],
-                    FlowLog['LogDestinationType'],
-                    FlowLog['LogDestination'],
-                    FlowLog['LogFormat']
-                ))
-
+                logger.debug("Flow Log ({FlowLogId}) is {FlowLogStatus} on {ResourceId}\n   traffic type: {TrafficType}\n   destination type: {LogDestinationType}\n   destination: {LogDestination}\n   log format: \n   {LogFormat}".format(**FlowLog))
                 difflist = []
                 if FlowLog['TrafficType'] != args.traffic_type:
                     difflist.append("Traffic type will change from {} to {}.".format(FlowLog['TrafficType'],args.traffic_type))
                 if FlowLog['LogDestination'] != bucket:
                     difflist.append("Log Destination will change from {} to {}.".format(FlowLog['LogDestination'],bucket))
-
                 if difflist == []:
                     # No actions to perform here
                     continue
-
                 logger.info("Existing flow log will be terminated and new flow log created with these changes:\n\t{}\n".format(difflist))
-
                 if args.force:
                     accept_destructive_update='y'
                 else:
@@ -109,8 +124,8 @@ def enable_flowlogs(VpcId,client,args,region):
                 else:
                     logger.info("User declined replacement of flow log {}".format(FlowLog['FlowLogId']))
             else:
+                logger.debug("   Flow Log going to ({}) does not exist for this bucket. Creating.".format(bucket))
                 create_flowlog(VpcId,bucket,client,args,region)
-
     return
 
 def delete_flowlog(VpcId, FlowLogId, actually_do_it, client, args, region):
@@ -174,6 +189,9 @@ def get_regions(session, args):
 def do_args():
     import argparse
     parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--make-bucket", help="Make missing bucket (may not be used with --flowlog-bucket)", action='store_true')
+    group.add_argument("--flowlog-bucket", help="S3 bucket to deposit logs to (may not be used with --make-bucket)")
     parser.add_argument("--debug", help="print debugging info", action='store_true')
     parser.add_argument("--error", help="print error info only", action='store_true')
     parser.add_argument("--timestamp", help="Output log with timestamp and toolname", action='store_true')
@@ -181,7 +199,6 @@ def do_args():
     parser.add_argument("--profile", help="Use this CLI profile (instead of default or env credentials)")
     parser.add_argument("--vpc-id", help="Only Process Specified VPC")
     parser.add_argument("--actually-do-it", help="Actually Perform the action", action='store_true')
-    parser.add_argument("--flowlog-bucket", help="S3 bucket to deposit logs to", required=True)
     parser.add_argument("--traffic-type", help="The type of traffic to log", default='ALL', choices=['ACCEPT','REJECT','ALL'])
     parser.add_argument("--force", help="Perform flowlog replacement without prompt", action='store_true')
 
