@@ -19,4 +19,18 @@ This repo has several scripts you can run against your account to enable all the
 * [Enable GuardDuty](guardduty/README.md)
 * [Enable Amazon S3 Block Public Access](s3-block-public-access/README.md)
 
+## Installing prerequisites 
 
+The scripts in this repo only currently only require `boto3` & `pytz`. Both [pipenv](https://pypi.org/project/pipenv/) and plain pip as well
+
+### pipenv
+
+```bash
+pipenv install
+```
+
+### pip
+
+```bash
+pip install -r requirements.txt
+```
