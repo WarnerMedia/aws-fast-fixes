@@ -67,49 +67,54 @@ def enable_flowlogs(VpcId,client,args,region):
                 }
             ]
         ):
+        
+        if page['FlowLogs']:
 
-        for FlowLog in page['FlowLogs']:
-            if FlowLog['LogDestination'] == bucket:
-                accept_destructive_update=False
+            for FlowLog in page['FlowLogs']:
+                if FlowLog['LogDestination'] == bucket:
+                    
+                    accept_destructive_update=False
 
-                logger.debug("   Flow Log ({}) already exist, region:{}, VPC:{}".format(FlowLog['FlowLogId'],region,VpcId))
-                if FlowLog['DeliverLogsStatus'] == 'FAILED':
-                    logger.error("Flow Log ({}) failed, region:{}, VPC:{}, please check it".format(FlowLog['FlowLogId'],region,VpcId))
-                    return
+                    logger.debug("   Flow Log ({}) already exist, region:{}, VPC:{}".format(FlowLog['FlowLogId'],region,VpcId))
+                    if FlowLog['DeliverLogsStatus'] == 'FAILED':
+                        logger.error("Flow Log ({}) failed, region:{}, VPC:{}, please check it".format(FlowLog['FlowLogId'],region,VpcId))
+                        return
 
-                logger.debug("Flow Log ({}) is {} on {}\n   traffic type: {}\n   destination type: {}\n   destination: {}\n   log format: \n   {}".format(
-                    FlowLog['FlowLogId'],
-                    FlowLog['FlowLogStatus'],
-                    FlowLog['ResourceId'],
-                    FlowLog['TrafficType'],
-                    FlowLog['LogDestinationType'],
-                    FlowLog['LogDestination'],
-                    FlowLog['LogFormat']
-                ))
+                    logger.debug("Flow Log ({}) is {} on {}\n   traffic type: {}\n   destination type: {}\n   destination: {}\n   log format: \n   {}".format(
+                        FlowLog['FlowLogId'],
+                        FlowLog['FlowLogStatus'],
+                        FlowLog['ResourceId'],
+                        FlowLog['TrafficType'],
+                        FlowLog['LogDestinationType'],
+                        FlowLog['LogDestination'],
+                        FlowLog['LogFormat']
+                    ))
 
-                difflist = []
-                if FlowLog['TrafficType'] != args.traffic_type:
-                    difflist.append("Traffic type will change from {} to {}.".format(FlowLog['TrafficType'],args.traffic_type))
-                if FlowLog['LogDestination'] != bucket:
-                    difflist.append("Log Destination will change from {} to {}.".format(FlowLog['LogDestination'],bucket))
+                    difflist = []
+                    if FlowLog['TrafficType'] != args.traffic_type:
+                        difflist.append("Traffic type will change from {} to {}.".format(FlowLog['TrafficType'],args.traffic_type))
+                    if FlowLog['LogDestination'] != bucket:
+                        difflist.append("Log Destination will change from {} to {}.".format(FlowLog['LogDestination'],bucket))
 
-                if difflist == []:
-                    # No actions to perform here
-                    continue
+                    if difflist == []:
+                        # No actions to perform here
+                        continue
 
-                logger.info("Existing flow log will be terminated and new flow log created with these changes:\n\t{}\n".format(difflist))
+                    logger.info("Existing flow log will be terminated and new flow log created with these changes:\n\t{}\n".format(difflist))
 
-                if args.force:
-                    accept_destructive_update='y'
+                    if args.force:
+                        accept_destructive_update='y'
+                    else:
+                        accept_destructive_update = input(f'Do you wish to continue? [y/N] ').lower()
+                    if accept_destructive_update[:1] == 'y':
+                        delete_flowlog(VpcId,FlowLog['FlowLogId'],True,client,args,region)
+                        create_flowlog(VpcId,bucket,client,args,region)
+                    else:
+                        logger.info("User declined replacement of flow log {}".format(FlowLog['FlowLogId']))
                 else:
-                    accept_destructive_update = input(f'Do you wish to continue? [y/N] ').lower()
-                if accept_destructive_update[:1] == 'y':
-                    delete_flowlog(VpcId,FlowLog['FlowLogId'],True,client,args,region)
                     create_flowlog(VpcId,bucket,client,args,region)
-                else:
-                    logger.info("User declined replacement of flow log {}".format(FlowLog['FlowLogId']))
-            else:
-                create_flowlog(VpcId,bucket,client,args,region)
+        else:
+            create_flowlog(VpcId,bucket,client,args,region)
 
     return
 
