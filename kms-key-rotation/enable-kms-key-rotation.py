@@ -41,18 +41,24 @@ def main(args, logger):
                 if e.response['Error']['Code'] == 'AccessDeniedException':
                     logger.warning(f"Unable to get details of key {k} in {region}: AccessDenied")
                     continue
-            else:
-                raise
+                else:
+                    raise
 
 def enable_key_rotation(kms_client, KeyId):
     '''Actually perform the enabling of Key rotation and checking of the status code'''
-    response = kms_client.enable_key_rotation(KeyId=KeyId)
-    if response['ResponseMetadata']['HTTPStatusCode'] == 200:
-        return(True)
-    else:
-        logger.error(f"Attempt to enable key rotation for {KeyId} returned {response}")
-        return(False)
-
+    try:
+        response = kms_client.enable_key_rotation(KeyId=KeyId)
+        if response['ResponseMetadata']['HTTPStatusCode'] == 200:
+            return(True)
+        else:
+            logger.error(f"Attempt to enable key rotation for {KeyId} returned {response}")
+            return(False)
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'KMSInvalidStateException':
+            logger.warning(f"KMS Key {KeyId} is pending deletion")
+            return(True)
+        else:
+            raise
 
 def get_all_keys(kms_client):
     '''Return an array of all KMS keys for this region'''
