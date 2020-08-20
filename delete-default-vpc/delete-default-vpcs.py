@@ -3,6 +3,7 @@
 import boto3
 from botocore.exceptions import ClientError
 import logging
+import os
 
 max_workers = 10
 
@@ -211,7 +212,7 @@ def do_args():
     parser.add_argument("--timestamp", help="Output log with timestamp and toolname", action='store_true')
     parser.add_argument("--profile", help="Use this CLI profile (instead of default or env credentials)")
     parser.add_argument("--region", help="Only look for default VPCs in this region")
-    parser.add_argument("--boto-region", help="Initial AWS region for boto3 client", default="us-east-1")
+    parser.add_argument("--boto-region", help="Initial AWS region for boto3 client", default=os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
     parser.add_argument("--exclude-regions", nargs='+', help="REGION1, REGION2 Do not attempt to delete default VPCs in these regions")
     parser.add_argument("--vpc-id", help="Only delete the VPC specified")
     parser.add_argument("--actually-do-it", help="Actually Perform the action (default behavior is to report on what would be done)", action='store_true')
