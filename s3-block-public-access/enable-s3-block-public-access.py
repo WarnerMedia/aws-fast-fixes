@@ -56,7 +56,7 @@ def main(args, logger):
 def fix_bucket(s3_client, bucket, args, f=None):
     '''Determine if the Bucket is safe to fix. Do the fix or write the AWS CLI or just notify based on args '''
     if not is_safe_to_fix_bucket(s3_client, bucket):
-        logger.warning(f"Bucket {bucket} has a bucket policy or ACLs that could conflict with Block Public Access. Not Enabling it.")
+        logger.warning(f"Bucket {bucket} has a bucket policy, conflicting ACLs or Website Hosting enabled which could conflict with Block Public Access. Not Enabling it.")
         return(False)
     elif args.actually_do_it is True:
         logger.info(f"Enabling Block Public Access on {bucket}")
@@ -77,7 +77,7 @@ def fix_bucket(s3_client, bucket, args, f=None):
 
 def is_safe_to_fix_bucket(s3_client, bucket_name):
     '''Check ACLS and Policy to see if Bucket is safe to fix'''
-    return(is_safe_to_fix_by_acl(s3_client, bucket_name) and is_safe_to_fix_by_policy(s3_client, bucket_name))
+    return(is_safe_to_fix_by_acl(s3_client, bucket_name) and is_safe_to_fix_by_policy(s3_client, bucket_name) and is_safe_to_fix_by_bucket_website(s3_client, bucket_name))
 
 
 def is_safe_to_fix_by_acl(s3_client, bucket_name):
@@ -121,6 +121,19 @@ def is_safe_to_fix_by_policy(s3_client, bucket_name):
         else:
             raise
 
+def is_safe_to_fix_by_bucket_website(s3_client, bucket_name):
+    '''Inspect Bucket Website and determine if this bucket is safe to fix'''
+
+    try:
+        s3_client.get_bucket_website(Bucket=bucket_name)
+        logger.warning(f"Bucket {bucket_name} is Hosting a Website!")
+        return(False)  # Not Safe, Bucket Website Hosting enabled
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'NoSuchWebsiteConfiguration':
+            # No Bucket Website Hosting
+            return(True)
+        else:
+            raise
 
 def enable_block_public_access(s3_client, bucket_name):
     '''Actually perform the enabling of block public access and checking of the status code'''
