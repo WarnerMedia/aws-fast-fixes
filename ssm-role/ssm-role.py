@@ -70,39 +70,34 @@ def attach_policy_to_role(session, role_name, policy_arn):
     session.client('iam').attach_role_policy(RoleName=role_name, PolicyArn=policy_arn)
 
 def attach_role(session, instance_id, instance_name, role_name, args):
-    '''
-    Attaches IAM instance profile (role) to ec2 instance
-    '''
+    '''Attaches IAM instance profile (role) to ec2 instance'''
     if args.actually_do_it:
         logging.info(f"InstanceId: {instance_id}, Name: {instance_name} attaching IAM Role: {role_name}")
         attach_instance_profile(session, instance_id, role_name)
     else:
         logging.info(f"InstanceId: {instance_id}, Name: {instance_name} has no IAM Role attached.  Will attach IAM Role: {role_name}")
 
-def audit_role(session, instance_profile, policy_arn, actually_do_it):
-    '''
-    Audit role already attached to instance to ensure policy is present
-    '''
+def audit_role(session, instance_id, instance_name, instance_profile, policy_arn, actually_do_it):
+    '''Audit role already attached to instance to ensure policy is present'''
     role_name = get_role_name(session, instance_profile)
     policies = get_role_policy(session, role_name)
 
     if policy_arn not in policies:
-        if args.actually_do_it:
+        if args.actually_do_it and args.also_attach_to_existing_roles:
             logging.info(f"Role: {role_name}, Instance Profile {instance_profile}, attaching {policy_arn}")
             attach_policy_to_role(session, role_name, policy_arn)
         else:
-            logging.info(f"Role: {role_name}, Instance Profile {instance_profile}, does not have {policy_arn} attached")
+            logging.info(f"Role: {role_name}, Instance Profile {instance_profile}, InstanceId: {instance_id}, Name: {instance_name} does not have {policy_arn} attached")
 
 def do_args():
-    '''
-    Returns command line args
-    '''
+    '''Returns command line args'''
     parser = argparse.ArgumentParser()
     parser.add_argument("--region", help="Only Process Specified Region")
     parser.add_argument("--profile", help="Use this CLI profile (instead of default or env credentials)")
     parser.add_argument("--role", help="Name of role", default='ssm_common')
     parser.add_argument("--policy", help="Policy arn to attach to role if instance already has IAM profile attached to ec2", default='arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore')
     parser.add_argument("--actually-do-it", help="Actually Perform the action", action='store_true')
+    parser.add_argument("--also-attach-to-existing-roles", help="Adds permissions to existing roles", action='store_true')
     args = parser.parse_args()
     return(args)
 
@@ -138,6 +133,10 @@ def create_ssm_role(session, role_name, policy_arn, args):
                         'Key': 'Name',
                         'Value': role_name
                     },
+                    {
+                        'Key': 'Description',
+                        'Value': 'Created by aws-fast-fix ssm-role.py'
+                    },
                 ]
             )
             iam.create_instance_profile (
@@ -166,13 +165,16 @@ if __name__ == '__main__':
     else:
         session = boto3.Session()
 
-    create_ssm_role(session, args.role, args.policy, args)
-    regions = get_regions(session, args)
-    for instance in get_ec2(session, regions, state="running"):
-        instance_id = instance.get('InstanceId')
-        instance_name = instance.get('Name')
-        if 'IamInstanceProfile' not in instance:
-            attach_role(session, instance_id, instance_name, args.role, args)
-        else:
-            instance_profile = instance['IamInstanceProfile']['Arn'].split('instance-profile/')[-1]
-            audit_role(session, instance_profile, args.policy, args)
+    try:
+        create_ssm_role(session, args.role, args.policy, args)
+        regions = get_regions(session, args)
+        for instance in get_ec2(session, regions, state="running"):
+            instance_id = instance.get('InstanceId')
+            instance_name = instance.get('Name')
+            if 'IamInstanceProfile' not in instance:
+                attach_role(session, instance_id, instance_name, args.role, args)
+            else:
+                instance_profile = instance['IamInstanceProfile']['Arn'].split('instance-profile/')[-1]
+                audit_role(session, instance_id, instance_name, instance_profile, args.policy, args)
+    except KeyboardInterrupt:
+        exit(1)
