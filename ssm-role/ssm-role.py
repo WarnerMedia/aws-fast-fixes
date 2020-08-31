@@ -54,10 +54,10 @@ def get_role_policy(session, role_name):
     policies = session.client('iam').list_attached_role_policies(RoleName=role_name)['AttachedPolicies']
     return [p.get('PolicyArn') for p in policies]
 
-def attach_instance_profile(session, instance_id, profile_name):
+def attach_instance_profile(session, instance_id, region, profile_name):
     '''Attaches instance profile to e2 instance'''
     account = get_account(session)
-    session.client('ec2').associate_iam_instance_profile(
+    session.client('ec2', region_name=region).associate_iam_instance_profile(
         IamInstanceProfile={
             "Arn" :  f"arn:aws:iam::{account}:instance-profile/{profile_name}",
             "Name": profile_name
@@ -69,11 +69,11 @@ def attach_policy_to_role(session, role_name, policy_arn):
     '''Attaches policy to role'''
     session.client('iam').attach_role_policy(RoleName=role_name, PolicyArn=policy_arn)
 
-def attach_role(session, instance_id, instance_name, role_name, args):
+def attach_role(session, instance_id, instance_name, region, role_name, args):
     '''Attaches IAM instance profile (role) to ec2 instance'''
     if args.actually_do_it:
         logging.info(f"InstanceId: {instance_id}, Name: {instance_name} attaching IAM Role: {role_name}")
-        attach_instance_profile(session, instance_id, role_name)
+        attach_instance_profile(session, instance_id, region, role_name)
     else:
         logging.info(f"InstanceId: {instance_id}, Name: {instance_name} has no IAM Role attached.  Will attach IAM Role: {role_name}")
 
@@ -171,8 +171,9 @@ if __name__ == '__main__':
         for instance in get_ec2(session, regions, state="running"):
             instance_id = instance.get('InstanceId')
             instance_name = instance.get('Name')
+            region = instance.get('Region')
             if 'IamInstanceProfile' not in instance:
-                attach_role(session, instance_id, instance_name, args.role, args)
+                attach_role(session, instance_id, instance_name, region, args.role, args)
             else:
                 instance_profile = instance['IamInstanceProfile']['Arn'].split('instance-profile/')[-1]
                 audit_role(session, instance_id, instance_name, instance_profile, args.policy, args)
