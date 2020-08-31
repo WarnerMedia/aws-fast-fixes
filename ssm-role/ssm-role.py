@@ -75,7 +75,7 @@ def attach_role(session, instance_id, instance_name, region, role_name, args):
         logging.info(f"InstanceId: {instance_id}, Name: {instance_name} attaching IAM Role: {role_name}")
         attach_instance_profile(session, instance_id, region, role_name)
     else:
-        logging.info(f"InstanceId: {instance_id}, Name: {instance_name} has no IAM Role attached.  Will attach IAM Role: {role_name}")
+        logging.warning(f"InstanceId: {instance_id}, Name: {instance_name} has no IAM Role attached.  Will attach IAM Role: {role_name}")
 
 def audit_role(session, instance_id, instance_name, instance_profile, policy_arn, actually_do_it):
     '''Audit role already attached to instance to ensure policy is present'''
@@ -87,7 +87,7 @@ def audit_role(session, instance_id, instance_name, instance_profile, policy_arn
             logging.info(f"Role: {role_name}, Instance Profile {instance_profile}, attaching {policy_arn}")
             attach_policy_to_role(session, role_name, policy_arn)
         else:
-            logging.info(f"Role: {role_name}, Instance Profile {instance_profile}, InstanceId: {instance_id}, Name: {instance_name} does not have {policy_arn} attached")
+            logging.warning(f"Role: {role_name}, Instance Profile {instance_profile}, InstanceId: {instance_id}, Name: {instance_name} does not have {policy_arn} attached")
 
 def do_args():
     '''Returns command line args'''
@@ -149,11 +149,11 @@ def create_ssm_role(session, role_name, policy_arn, args):
             )
             attach_policy_to_role(session, role_name, policy_arn)
         else:
-            logging.info(f"Role: {role_name}, Instance Profile: {role_name}, Policy {policy_arn} will be created")
+            logging.warning(f"Role: {role_name}, Instance Profile: {role_name}, Policy {policy_arn} will be created")
 
 if __name__ == '__main__':
     # logging
-    logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
+    formatter = logging.Formatter('%(levelname)s - %(message)s')
     logging.getLogger('botocore').setLevel(logging.WARNING)
     logging.getLogger('boto3').setLevel(logging.WARNING)
     logging.getLogger('urllib3').setLevel(logging.WARNING)
