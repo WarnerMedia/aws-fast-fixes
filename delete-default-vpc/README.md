@@ -18,8 +18,13 @@ If no ENIs exist, it will delete all the resources in the VPC including the subn
 
 ```bash
 usage: delete-default-vpcs.py [-h] [--debug] [--error] [--timestamp]
-                                        [--profile PROFILE] [--actually-do-it]
-                                        [--output-script FILENAME]
+                                        [--profile PROFILE]
+                                        [--region REGION]
+                                        [--exclude-regions REGION1, REGION2] 
+                                        [--vpc-id] VPCID
+                                        [--boto-region] REGION
+                                        [--actually-do-it]
+
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -28,6 +33,7 @@ optional arguments:
   --timestamp           Output log with timestamp and toolname
   --profile PROFILE     Use this CLI profile (instead of default or env credentials)
   --region REGION       Only look for default VPCs in this region
+  --boto-region REGION  Initial AWS region for boto3 client (defaults to us-east-1)
   --exclude-regions REGION1, REGION2  Do not attempt to delete default VPCs in these regions
   --vpc-id VPCID        Only delete the VPC specified (must match --region )
   --actually-do-it      Actually Perform the action (default behavior is to report on what would be done)
