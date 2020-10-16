@@ -4,7 +4,7 @@ This script will enable Lambda function log groups for all regions in your accou
 
 ## Why?
 
-Lambda automatically integrates with CloudWatch Logs and pushes all logs from your code to a CloudWatch Logs group associated with a Lambda function, which is named /aws/lambda/<function name>. If the log group associated with a Lambda function is not found, you'll find the following error in AWS console:
+Lambda automatically integrates with CloudWatch Logs and pushes all logs from your code to a CloudWatch Logs group associated with a Lambda function, which is named /aws/lambda/[function name]. If the log group associated with a Lambda function is not found, you'll find the following error in AWS console:
 
 ```Log group does not exist
 The specific log group: /aws/lambda/<function name> does not exist in this account or region.
