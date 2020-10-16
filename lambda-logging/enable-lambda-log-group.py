@@ -17,7 +17,6 @@ def main(args, logger):
 
     # Get all the Regions for this account
     for region in get_regions(session, args):
-        print(region) #test only
         lambda_client = session.client("lambda", region_name=region)
         cwlog_client = session.client("logs", region_name=region)
 
@@ -46,12 +45,10 @@ def main(args, logger):
 def create_log_group(cwlog_client, region, log_group_name):
     '''Actually perform the creation of log group'''
     try:
-        # do we need to use waiter here?
         cwlog_client.create_log_group(logGroupName=log_group_name)
 
-    except:
-        # CloudWatchLogs.Client.exceptions.ResourceAlreadyExistsException as e
-        logger.error(f"Attempt to create log group {log_group_name} in {region} returned error")
+    except ClientError as e:
+        logger.error(f"Attempt to create log group {log_group_name} in {region} returned \"{e}\"")
 
 
 
