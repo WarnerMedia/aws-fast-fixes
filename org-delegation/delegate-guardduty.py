@@ -20,23 +20,26 @@ def main(args, logger):
 
     # GuardDuty needs to be enabled Regionally. Gah!
     for r in get_regions(session, args):
-        guardduty_client = session.client("guardduty", region_name=r)
-        response = guardduty_client.list_organization_admin_accounts()
-        if len(response['AdminAccounts']) > 1:
-            logger.error(f"too many admin accounts in region {r}. Cannot proceed.")
-        elif len(response['AdminAccounts']) == 1:
-            if response['AdminAccounts'][0]['AdminAccountId'] == args.accountId:
-                logger.debug(f"Account {args.accountId} is already the delegated admin for region {r} and in state {response['AdminAccounts'][0]['AdminStatus']}")
+        try:
+            guardduty_client = session.client("guardduty", region_name=r)
+            response = guardduty_client.list_organization_admin_accounts()
+            if len(response['AdminAccounts']) > 1:
+                logger.error(f"too many admin accounts in region {r}. Cannot proceed.")
+            elif len(response['AdminAccounts']) == 1:
+                if response['AdminAccounts'][0]['AdminAccountId'] == args.accountId:
+                    logger.debug(f"Account {args.accountId} is already the delegated admin for region {r} and in state {response['AdminAccounts'][0]['AdminStatus']}")
+                else:
+                    logger.error(f"{response['AdminAccounts'][0]['AdminAccountId']} is already the delegated admin in {r}. Not performing update")
+            elif args.actually_do_it is True:
+                try:
+                    logger.info(f"Enablng GuardDuty Delegated Admin to {args.accountId} in region {r}")
+                    guardduty_client.enable_organization_admin_account(AdminAccountId=args.accountId)
+                except ClientError as e:
+                    logger.critical(e)
             else:
-                logger.error(f"{response['AdminAccounts'][0]['AdminAccountId']} is already the delegated admin in {r}. Not performing update")
-        elif args.actually_do_it is True:
-            try:
-                logger.info(f"Enablng GuardDuty Delegated Admin to {args.accountId} in region {r}")
-                guardduty_client.enable_organization_admin_account(AdminAccountId=args.accountId)
-            except ClientError as e:
-                logger.critical(e)
-        else:
-            logger.info(f"Would enable GuardDuty Delegated Admin to {args.accountId} in region {r}")
+                logger.info(f"Would enable GuardDuty Delegated Admin to {args.accountId} in region {r}")
+        except ClientError as e:
+            logger.warning(f"Failure in {r}: {e}")
 
 def get_regions(session, args):
     '''Return a list of regions with us-east-1 first. If --region was specified, return a list wth just that'''
