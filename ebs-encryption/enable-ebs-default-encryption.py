@@ -26,10 +26,31 @@ def main(args, logger):
             if args.actually_do_it is True:
                 logger.info(f"Enabling Default EBS Encryption in {region}")
                 enable_default_encryption(ec2_client, region)
+                if args.create_cmk is True:
+                    key_id = create_cmk(session, region)
+                    ec2_client.modify_ebs_default_kms_key_id(KmsKeyId=key_id)
             else:
                 logger.info(f"You Need To Enable Default EBS Encryption in {region}")
         else:
             logger.debug(f"Default EBS Encryption is enabled in {region}")
+
+
+def create_cmk(session, region):
+    '''Create a new CMK for use with EBS'''
+    client = session.client("kms", region_name=region)
+    response = client.create_key(
+        # Policy='string',
+        Description=f"Default EBS Key for {region}",
+        Origin='AWS_KMS',
+        BypassPolicyLockoutSafetyCheck=False
+    )
+    key = response['KeyMetadata']
+    client.create_alias(
+        AliasName='alias/default-ebs-cmk',
+        TargetKeyId=key['KeyId']
+    )
+    print(f"Created Key {key['KeyId']} in {region} with ARN of {key['Arn']}")
+    return(key['Arn'])
 
 
 
@@ -73,6 +94,8 @@ def do_args():
     parser.add_argument("--region", help="Only Process Specified Region")
     parser.add_argument("--profile", help="Use this CLI profile (instead of default or env credentials)")
     parser.add_argument("--actually-do-it", help="Actually Perform the action", action='store_true')
+    parser.add_argument("--create-cmk", help="Create a AWS CMK in each region for use with EBS Default Encryption", action='store_true')
+
 
     args = parser.parse_args()
 
