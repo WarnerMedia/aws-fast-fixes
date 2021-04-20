@@ -4,6 +4,7 @@ import boto3
 from botocore.exceptions import ClientError
 import os
 import logging
+import time
 
 
 def main(args, logger):
@@ -28,7 +29,13 @@ def main(args, logger):
 
         for page in page_iterator:
             func_list = page['Functions']
+            count = 0
             for func in func_list:
+                count = count + 1
+                if count > 5:
+                    # sleep 1 sec after 5 call (limit 5/sec)
+                    time.sleep(1)
+                    count = 0
                 func_name = func.get('FunctionName')
                 log_group_name=f"/aws/lambda/{func_name}"
                 logs = cwlog_client.describe_log_groups(logGroupNamePrefix=log_group_name)
