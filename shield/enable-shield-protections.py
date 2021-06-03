@@ -29,6 +29,7 @@ def main(args, logger):
         exit(1)
 
     # Get the list of protected resource. These we do not have to process again
+    # This call returns a global list, it doesn't have to be run in each region.
     protections = get_protected_resources(session)
 
     for region in all_regions:
@@ -37,8 +38,6 @@ def main(args, logger):
 
         if args.resource_type == "ALB":
             unprotected_arns = get_all_albs(protections, session, region)
-        elif args.resource_type == "APIGW":
-            unprotected_arns = get_all_apigw(protections, session, region)
         elif args.resource_type == "CloudFront":
             unprotected_arns = get_all_cloudfront(protections, session, region)
         else:
@@ -73,6 +72,7 @@ def get_subscription(session):
 
 
 def get_protected_resources(session):
+    '''Return an Array of ARNs that have Shield Advanced Protections already enabled '''
     # It doesn't matter which region I make this call from
     shield_client = session.client("shield")
     protections = []
@@ -103,6 +103,7 @@ def enable_protection(shield_client, arn, name):
 
 
 def get_all_cloudfront(protections, session, region):
+    '''Return a Dict containing all unprotected CF distributions. The Dict Key is the ARN, the Dict value is the name'''
     output = {}
     client = session.client('cloudfront', region_name=region)
     response = client.list_distributions(MaxItems="1000")
@@ -110,12 +111,6 @@ def get_all_cloudfront(protections, session, region):
         # Empty CF List.
         return(output)
     for cf in response['DistributionList']['Items']:
-        # if lb['Type'] != 'application':
-        #     # Don't care
-        #     continue
-        # if lb['Scheme'] != 'internet-facing':
-        #     # Also Don't care
-        #     continue
         if cf['ARN'] in protections:
             logger.debug(f"Arn {cf['ARN']} is already protected by Shield Advanced")
             continue
@@ -124,6 +119,7 @@ def get_all_cloudfront(protections, session, region):
 
 
 def get_all_albs(protections, session, region):
+    '''Return a Dict containing all unprotected ALBs. The Dict Key is the ARN, the Dict value is the name'''
     output = {}
     client = session.client('elbv2', region_name=region)
     response = client.describe_load_balancers()
