@@ -5,7 +5,7 @@ from botocore.exceptions import ClientError
 import os
 import logging
 import time
-from datetime import datetime as dt, timedelta
+from datetime import datetime as dt, timedelta, time
 import json
 
 # python3 ./lookup-events.py --debug
@@ -16,8 +16,18 @@ def main(args, logger):
     # only care about us-east-1, use default profile
     client = boto3.client('cloudtrail')
 
-    lastHourDateTime = dt.now() - timedelta(hours=1)
-    now = dt.now()
+    lastHourDateTime = dt.utcnow() - timedelta(minutes=40)
+    now = dt.utcnow()
+    startTime = lastHourDateTime
+    endTime = now
+    # must be utc time, is it calendar time converting to utc? try again with June 11, 2021, 16:58:30 (UTC-04:00) and June 11, 2021, 17:00:49 (UTC-04:00)
+    # startDt = dt(2020, 6, 11)
+    # t = time(20, 10, 1)
+    # startTime = dt.combine(startDt.date(), t)
+    # endTime = dt.combine(startDt.date(), time(21, 0, 1))
+    print(startTime)
+    print(endTime)
+
     maxResult = 200
     events_found = []
     response = client.lookup_events(
@@ -27,13 +37,13 @@ def main(args, logger):
                 'AttributeValue': 'GetTopicAttributes'
             },
         ],
-        StartTime=lastHourDateTime,
-        EndTime=now,
+        StartTime=startTime,
+        EndTime=endTime,
         MaxResults=maxResult
         # no NextToken at first
     )
     # process response, add to events array
-    events_found.append(search_events(response["Events"]))
+    events_found = events_found + search_events(response["Events"])
 
     if "NextToken" in response:
         nextToken = response["NextToken"]
@@ -48,12 +58,12 @@ def main(args, logger):
                         'AttributeValue': 'GetTopicAttributes'
                     },
                 ],
-                StartTime=lastHourDateTime,
-                EndTime=now,
+                StartTime=startTime,
+                EndTime=endTime,
                 MaxResults=maxResult,
                 NextToken=nextToken
             )
-            events_found.append(search_events(response["Events"]))
+            events_found = events_found + search_events(response["Events"])
 
             if "NextToken" in response:
                 nextToken = response["NextToken"]
@@ -62,19 +72,24 @@ def main(args, logger):
                 # loop ends
                 nextToken = ""
     print(events_found)
+    print(len(events_found))
     return events_found
 
 
 def search_events(events):
     # list events with error code of "accessdenied" or "unauthorized"
-    events = []
+    filtered = []
     for event in events:
+        # if "Username" in event:
+        #     if event["Username"].lower() == "<valid email for assumed role>":
+        #         filtered.append(event)
+
         event_detail_str = event["CloudTrailEvent"]
         event_detail = json.loads(event_detail_str)
         if "errorCode" in event_detail:
             if event_detail["errorCode"].lower() == "accessdenied" or event_detail["errorCode"].lower() == "unauthorized":
-                events.append(event)
-    return events
+                filtered.append(event)
+    return filtered
 
 
 def do_args():
