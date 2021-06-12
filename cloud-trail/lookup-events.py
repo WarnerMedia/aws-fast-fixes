@@ -16,27 +16,23 @@ def main(args, logger):
     # only care about us-east-1, use default profile
     client = boto3.client('cloudtrail')
 
-    lastHourDateTime = dt.utcnow() - timedelta(minutes=40)
+    lastHourDateTime = dt.utcnow() - timedelta(minutes=30)
     now = dt.utcnow()
     startTime = lastHourDateTime
     endTime = now
-    # must be utc time, is it calendar time converting to utc? try again with June 11, 2021, 16:58:30 (UTC-04:00) and June 11, 2021, 17:00:49 (UTC-04:00)
-    # startDt = dt(2020, 6, 11)
-    # t = time(20, 10, 1)
-    # startTime = dt.combine(startDt.date(), t)
-    # endTime = dt.combine(startDt.date(), time(21, 0, 1))
+
     print(startTime)
     print(endTime)
 
     maxResult = 200
     events_found = []
     response = client.lookup_events(
-        LookupAttributes=[
-            {
-                'AttributeKey': 'EventName',
-                'AttributeValue': 'GetTopicAttributes'
-            },
-        ],
+        # LookupAttributes=[
+        #     {
+        #         'AttributeKey': 'EventName',
+        #         'AttributeValue': 'GetTopicAttributes'
+        #     },
+        # ],
         StartTime=startTime,
         EndTime=endTime,
         MaxResults=maxResult
@@ -52,12 +48,12 @@ def main(args, logger):
 
         while nextToken:
             response = client.lookup_events(
-                LookupAttributes=[
-                    {
-                        'AttributeKey': 'EventName',
-                        'AttributeValue': 'GetTopicAttributes'
-                    },
-                ],
+                # LookupAttributes=[
+                #     {
+                #         'AttributeKey': 'EventName',
+                #         'AttributeValue': 'GetTopicAttributes'
+                #     },
+                # ],
                 StartTime=startTime,
                 EndTime=endTime,
                 MaxResults=maxResult,
