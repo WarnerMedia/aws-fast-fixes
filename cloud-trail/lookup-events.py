@@ -8,67 +8,74 @@ import time
 from datetime import datetime as dt, timedelta, time
 import json
 
-# python3 ./lookup-events.py --debug
+# python3 ./lookup-events.py --debug --minutes 10 --user email@warnermedia.com
 
+def get_arg_minutes(args):
+    minutes_to_lookup = 30
+    try:
+        if args.minutes:
+            minutes_to_lookup = int(args.minutes)
+    except Exception as e:
+        logger.info("An exception occurred converting arg minutes: ", e) 
+    logger.info(f"minutes to look up: {minutes_to_lookup}")
+    return minutes_to_lookup
+
+def get_arg_user(args):
+    user_to_lookup = ""
+    if args.user:
+        user_to_lookup = args.user
+    logger.info(f"user to look up: {user_to_lookup}")
+    return user_to_lookup
 
 def main(args, logger):
     # just want to quickly run "aws cloudtrail lookup-events" without ThrottleException
     # only care about us-east-1, use default profile
     client = boto3.client('cloudtrail')
 
-    lastHourDateTime = dt.utcnow() - timedelta(minutes=30)
+    minutes_to_lookup = get_arg_minutes(args)
+    user_to_lookup = get_arg_user(args)
+
+    lastHourDateTime = dt.utcnow() - timedelta(minutes=minutes_to_lookup)
     now = dt.utcnow()
     startTime = lastHourDateTime
     endTime = now
 
-    print(startTime)
-    print(endTime)
+    logger.info(f"start Time: {startTime}")
+    logger.info(f"end time: {endTime}")
 
     maxResult = 200
     events_found = []
-    response = client.lookup_events(
-        # LookupAttributes=[
-        #     {
-        #         'AttributeKey': 'EventName',
-        #         'AttributeValue': 'GetTopicAttributes'
-        #     },
-        # ],
-        StartTime=startTime,
-        EndTime=endTime,
-        MaxResults=maxResult
-        # no NextToken at first
-    )
+    # no NextToken at first
+    event_arg = {"StartTime": startTime, "EndTime": endTime, "MaxResults": maxResult}
+    if user_to_lookup:
+        event_arg["LookupAttributes"] = [{
+            'AttributeKey': 'Username',
+            'AttributeValue': user_to_lookup
+        }]
+    response = client.lookup_events(**event_arg)
+
     # process response, add to events array
     events_found = events_found + search_events(response["Events"])
 
     if "NextToken" in response:
         nextToken = response["NextToken"]
 
-        print(nextToken)
+        logger.debug(nextToken)
 
         while nextToken:
-            response = client.lookup_events(
-                # LookupAttributes=[
-                #     {
-                #         'AttributeKey': 'EventName',
-                #         'AttributeValue': 'GetTopicAttributes'
-                #     },
-                # ],
-                StartTime=startTime,
-                EndTime=endTime,
-                MaxResults=maxResult,
-                NextToken=nextToken
-            )
+            event_arg["NextToken"] = nextToken
+            response = client.lookup_events(**event_arg)
+            
             events_found = events_found + search_events(response["Events"])
 
             if "NextToken" in response:
                 nextToken = response["NextToken"]
-                print(nextToken)
+                logger.debug(nextToken)
             else:
                 # loop ends
                 nextToken = ""
-    print(events_found)
-    print(len(events_found))
+    logger.info(f"events_found: {events_found}")
+    logger.info(f"{len(events_found)} events found")
     return events_found
 
 
@@ -76,10 +83,6 @@ def search_events(events):
     # list events with error code of "accessdenied" or "unauthorized"
     filtered = []
     for event in events:
-        # if "Username" in event:
-        #     if event["Username"].lower() == "<valid email for assumed role>":
-        #         filtered.append(event)
-
         event_detail_str = event["CloudTrailEvent"]
         event_detail = json.loads(event_detail_str)
         if "errorCode" in event_detail:
@@ -97,6 +100,10 @@ def do_args():
         "--error", help="print error info only", action='store_true')
     parser.add_argument(
         "--timestamp", help="Output log with timestamp and toolname", action='store_true')
+    parser.add_argument(
+        "--minutes", help="minutes to look up till now")
+    parser.add_argument(
+        "--user", help="user name to look up")
 
     args = parser.parse_args()
 
