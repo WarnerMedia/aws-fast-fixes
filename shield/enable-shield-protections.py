@@ -114,7 +114,7 @@ def get_all_cloudfront(protections, session, region):
         if cf['ARN'] in protections:
             logger.debug(f"Arn {cf['ARN']} is already protected by Shield Advanced")
             continue
-        output[cf['ARN']] = f"{cf['DomainName']} ({cf['Id']})"
+        output[cf['ARN']] = f"{cf['DomainName']}-{cf['Id']}"
     return(output)
 
 
