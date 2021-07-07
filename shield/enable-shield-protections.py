@@ -105,8 +105,11 @@ def enable_protection(shield_client, arn, name):
 def get_all_cloudfront(protections, session, region):
     '''Return a Dict containing all unprotected CF distributions. The Dict Key is the ARN, the Dict value is the name'''
     output = {}
+    count = 0
     client = session.client('cloudfront', region_name=region)
-    response = client.list_distributions(MaxItems="1000")
+
+
+    response = client.list_distributions(MaxItems="100")
     if 'Items' not in response['DistributionList']:
         # Empty CF List.
         return(output)
@@ -115,6 +118,23 @@ def get_all_cloudfront(protections, session, region):
             logger.debug(f"Arn {cf['ARN']} is already protected by Shield Advanced")
             continue
         output[cf['ARN']] = f"{cf['DomainName']}-{cf['Id']}"
+    count += len(response['DistributionList']['Items'])
+
+    while 'NextMarker' in response['DistributionList']:
+        response = client.list_distributions(MaxItems="100", Marker=response['DistributionList']['NextMarker'])
+        if 'Items' not in response['DistributionList']:
+            # Empty CF List.
+            return(output)
+        for cf in response['DistributionList']['Items']:
+            if cf['ARN'] in protections:
+                logger.debug(f"Arn {cf['ARN']} is already protected by Shield Advanced")
+                continue
+            output[cf['ARN']] = f"{cf['DomainName']}-{cf['Id']}"
+        count += len(response['DistributionList']['Items'])
+
+
+    logger.info(f"Found {count} Distributions")
+
     return(output)
 
 
@@ -122,6 +142,7 @@ def get_all_albs(protections, session, region):
     '''Return a Dict containing all unprotected ALBs. The Dict Key is the ARN, the Dict value is the name'''
     output = {}
     client = session.client('elbv2', region_name=region)
+
     response = client.describe_load_balancers()
     for lb in response['LoadBalancers']:
         if lb['Type'] != 'application':
@@ -134,6 +155,21 @@ def get_all_albs(protections, session, region):
             logger.debug(f"Arn {lb['LoadBalancerArn']} is already protected by Shield Advanced")
             continue
         output[lb['LoadBalancerArn']] = lb['LoadBalancerName']
+
+    while 'NextMarker' in response:
+        response = client.describe_load_balancers(Marker=response['NextMarker'])
+        for lb in response['LoadBalancers']:
+            if lb['Type'] != 'application':
+                # Don't care
+                continue
+            if lb['Scheme'] != 'internet-facing':
+                # Also Don't care
+                continue
+            if lb['LoadBalancerArn'] in protections:
+                logger.debug(f"Arn {lb['LoadBalancerArn']} is already protected by Shield Advanced")
+                continue
+            output[lb['LoadBalancerArn']] = lb['LoadBalancerName']
+
     return(output)
 
 
