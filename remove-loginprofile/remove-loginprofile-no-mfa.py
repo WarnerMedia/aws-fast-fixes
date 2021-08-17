@@ -40,7 +40,7 @@ def main(args, logger):
             if args.actually_do_it is True:
                 # otherwise if we're configured to fix
                 logger.info(f"Disabling Login for {username} - No threshold specified")
-                # disable_login(iam_client, username)
+                disable_login(iam_client, username)
             else:
                 # otherwise just report
                 logger.info(f"Need to Disable login for {username} - No threshold specified")
@@ -60,7 +60,7 @@ def main(args, logger):
             elif args.actually_do_it is True:
                 # otherwise if we're configured to fix
                 logger.info(f"Disabling Login for {username} - Last used {last_login}")
-                # disable_login(iam_client, username)
+                disable_login(iam_client, username)
             else:
                 # otherwise just report
                 logger.info(f"Need to Disable login for {username} - Last used {last_login}")
@@ -76,7 +76,7 @@ def main(args, logger):
             elif args.actually_do_it is True:
                 # otherwise if we're configured to fix
                 logger.info(f"Disabling Login for {username} - Created {create_date}")
-                # disable_login(iam_client, username)
+                disable_login(iam_client, username)
             else:
                 # otherwise just report
                 logger.info(f"Need to Disable login for {username} - Created {create_date}")
