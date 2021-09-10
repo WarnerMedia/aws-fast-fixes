@@ -34,3 +34,20 @@ pipenv install
 ```bash
 pip install -r requirements.txt
 ```
+
+## Using Docker
+
+A Dockerfile is included that will run a python container with the appropriate requirements installed. There is also a convenience script included that will mount your AWS credentials file into the container and run your command.
+
+### Docker
+
+```bash
+docker build -t aws-fast-fixes .
+docker run -it --rm -v PATH_TO_AWS_CREDENTIALS_FILE:/root/.aws/credentials:ro aws-fast-fixes COMMAND
+```
+
+### Script
+
+```bash
+./docker.sh COMMAND
+```
