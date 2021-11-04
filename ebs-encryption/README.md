@@ -8,7 +8,7 @@ Encryption-at-rest is a key security best practice. However when creating instan
 
 ## What the script does.
 
-Thsi script iterates through all the regions returned by ec2:DescribeRegions and if get_ebs_encryption_by_default() is false calls enable_ebs_encryption_by_default() to enable with a Default AWS Managed Key.
+This script iterates through all the regions returned by ec2:DescribeRegions and if get_ebs_encryption_by_default() is false calls enable_ebs_encryption_by_default() to enable with a Default AWS Managed Key.
 
 **Warning!!!** Per AWS: *After you enable encryption by default, you can no longer launch instances using instance types that do not support encryption. For more information, see [Supported Instance Types](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSEncryption.html#EBSEncryption_supported_instances).*
 
