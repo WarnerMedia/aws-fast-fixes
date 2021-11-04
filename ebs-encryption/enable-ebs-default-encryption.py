@@ -73,7 +73,7 @@ def get_regions(session, args):
         return([args.region])
 
     # otherwise return all the regions, us-east-1 first
-    ec2 = session.client('ec2')
+    ec2 = session.client('ec2', region_name="us-east-1")
     response = ec2.describe_regions()
     output = ['us-east-1']
     for r in response['Regions']:
