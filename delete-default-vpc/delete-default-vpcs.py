@@ -127,8 +127,8 @@ def delete_vpc(vpc,logger,region,debug):
                 logger.debug("Interface:{} attached to {},  VPC:{}, region:{}".format(eni.id,eni.attachment,vpc.id,region))
         return
     else:
-        logger.info("Deleting default VPC:{}, region:{}".format(vpc.id,region))
         if args.actually_do_it:
+            logger.info("Deleting default VPC:{}, region:{}".format(vpc.id,region))
             try:
                 vpc_resources = {
                     # dependency order from https://aws.amazon.com/premiumsupport/knowledge-center/troubleshoot-dependency-error-delete-vpc/
@@ -156,9 +156,8 @@ def delete_vpc(vpc,logger,region,debug):
                     logger.error("VPC:{} can't be delete due to dependency, {}".format(vpc.id, e))
                 else:
                     raise
-
             logger.info("Successfully deleted default VPC:{}, region:{}".format(vpc.id,region))
-        if not args.actually_do_it:
+        else:
             logger.info("Would delete default VPC:{}, region:{}".format(vpc.id,region))
 
 def process_region(args, region, session, logger):
