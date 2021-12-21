@@ -21,7 +21,7 @@ def start_image_scan(client, registry_id, repo_name, image_digest):
         )
         logger.info(response)
     except Exception as e:
-        logger.info(f'An exception occurred starting image scan in repo {repo_name} with image digest {image_digest}: ', e) 
+        logger.info(f'An exception occurred starting image scan in repo {repo_name} with image digest {image_digest}') 
 
 
 def list_ecr_repos(client, registry_id):
@@ -53,7 +53,7 @@ def list_ecr_repos(client, registry_id):
                     nextToken = ""
         return repo_names
     except Exception as e:
-        logger.info(f'An exception occurred starting image scan in repo {repo_name} with image digest {image_digest}: ', e) 
+        logger.info(f'An exception occurred in list_ecr_repos') 
     
 
 """
@@ -95,7 +95,7 @@ def list_images(client, registry_id, repo_name):
                     nextToken = ""
         return image_ids
     except Exception as e:
-        logger.info(f'An exception occurred starting image scan in repo {repo_name} with image digest {image_digest}: ', e) 
+        logger.info(f'An exception occurred listing images in repo {repo_name}') 
 
 
 def main(args, logger):

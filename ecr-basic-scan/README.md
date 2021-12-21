@@ -12,6 +12,10 @@ When continuous scanning is enabled for a repository, if an image hasn’t been 
 Registry scan configuration needs to be set up ahead of time. Note that as of this writing, basic scanning is not able to detect the log4j 2 vulnerability.
 
 
+## Errors
+The following error could occur as an image can only be scanned once per day:
+"An error occurred (LimitExceededException) when calling the StartImageScan operation: The scan quota per image has been exceeded. Wait and try again."
+
 ## Usage
 
 ```bash
