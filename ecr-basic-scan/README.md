@@ -1,6 +1,6 @@
 # ECR Registry Basic Scan
 
-This script will lookup ECR repos and images given an ECR registry id, then trigger scan manually for each image.
+This script will lookup ECR repos and images given an ECR registry id, then trigger scan manually for each image given that the registry scan configuration is set to Basic scan.
 
 ## Why?
 
@@ -9,7 +9,7 @@ When continuous scanning is enabled for a repository, if an image hasn’t been 
 
 
 ## What the script does not do
-Registry scan configuration needs to be set up ahead of time. Note that as of this writing, basic scanning is not able to detect the log4j 2 vulnerability.
+Registry scan configuration as Basic scan needs to be set up ahead of time. Note that as of this writing, basic scanning is not able to detect the log4j 2 vulnerability.
 
 
 ## Errors
