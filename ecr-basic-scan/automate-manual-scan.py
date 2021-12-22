@@ -10,6 +10,7 @@ import json
 
 # Assume basic scan setting has been set up in the private registry, otherwise the script throws error 
 # Trigger manual scan for all images in a repos, catch and display if any errors for each, continue with loop
+# python3 automate-manual-scan.py --registry-id <accountNumberForPrivateRegistry>
 def start_image_scan(client, registry_id, repo_name, image_digest):
     try:
         response = client.start_image_scan(
@@ -34,16 +35,14 @@ def list_ecr_repos(client, registry_id):
     try:
         response = client.describe_repositories(**payload)
         repos = response['repositories']
-        for repo in repos:
-            repo_names.append(repo['repositoryName'])
-        # repo_names = [repo_names.append(repo['repositoryName']) for repo in repos]
+        repo_names = [repo['repositoryName'] for repo in repos]
         if "NextToken" in response:
             nextToken = response["NextToken"]
 
             while nextToken:
                 payload["NextToken"] = nextToken
                 response = client.describe_repositories(**payload)
-                repo_names = [repo_names.append(repo.repositoryName) for repo in repos]
+                repo_names = repo_names + [repo['repositoryName'] for repo in repos]
 
                 if "NextToken" in response:
                     nextToken = response["NextToken"]
