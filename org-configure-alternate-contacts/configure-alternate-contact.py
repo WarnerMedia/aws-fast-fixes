@@ -30,38 +30,59 @@ def main(args, logger):
     client = boto3.client('account')
     for a in account_list:
         account_id = a['Id']
-        try:
+        # if account_id == "373051592877":
+        #     continue
+
+        current_contact = get_alternate_contact(a, client, args)
+        logger.debug(f"Account {a['Name']} ({account_id}) has contact type {args.contact_type} of {current_contact}")
+        if args.actually_do_it and args.override:
+            update_account_contact(a, client, args)
+        elif current_contact is None and args.actually_do_it:
+            update_account_contact(a, client, args)
+        elif current_contact is None:
+            logger.info(f"No alternate contact of type {args.contact_type} set for {a['Name']} ({account_id}) ")
+        else:
+            logger.info(f"Account {a['Name']} ({account_id}) already has contact type {args.contact_type} set to {current_contact['Name']} - {current_contact['EmailAddress']}")
+
+
+def get_alternate_contact(a, client, args):
+    try:
+        if a['Id'] == a['Arn'].split(':')[4]:
+            response = client.get_alternate_contact(AlternateContactType=args.contact_type)
+        else:
             response = client.get_alternate_contact(
-                AccountId=account_id,
+                AccountId=a['Id'],
                 AlternateContactType=args.contact_type
             )
-            current_contact = response['AlternateContact']
-            logger.debug(f"Account {a['Name']} ({account_id}) has contact type {args.contact_type} of {current_contact}")
-            if args.actually_do_it and args.override:
-                update_account_contact(a, client, args)
-            else:
-                logger.info(f"Account {a['Name']} ({account_id}) already has contact type {args.contact_type} set to {current_contact['Name']} - {current_contact['EmailAddress']}")
-        except ClientError as e:
-            if e.response['Error']['Code'] == "ResourceNotFoundException":
-                if args.actually_do_it:
-                    update_account_contact(a, client, args)
-                else:
-                    logger.info(f"No alternate contact of type {args.contact_type} set for {a['Name']} ({account_id}) ")
-
-
+        current_contact = response['AlternateContact']
+        return(current_contact)
+    except ClientError as e:
+        if e.response['Error']['Code'] == "ResourceNotFoundException":
+            return(None)
+        else:
+            raise
 
 
 def update_account_contact(a, client, args):
     account_id = a['Id']
     try:
-        response = client.put_alternate_contact(
-            AccountId=account_id,
-            AlternateContactType=args.contact_type,
-            EmailAddress=args.contact_email,
-            Name=args.contact_name,
-            PhoneNumber=args.contact_phone,
-            Title=args.contact_title
-        )
+        if a['Id'] == a['Arn'].split(':')[4]:
+            response = client.put_alternate_contact(
+                AlternateContactType=args.contact_type,
+                EmailAddress=args.contact_email,
+                Name=args.contact_name,
+                PhoneNumber=args.contact_phone,
+                Title=args.contact_title
+            )
+        else:
+            response = client.put_alternate_contact(
+                AccountId=account_id,
+                AlternateContactType=args.contact_type,
+                EmailAddress=args.contact_email,
+                Name=args.contact_name,
+                PhoneNumber=args.contact_phone,
+                Title=args.contact_title
+            )
         logger.info(f"Set Alternate Contact {args.contact_type} for {a['Name']} ({account_id}) ")
     except ClientError as e:
         logger.error(f"Error Setting Alternate Contact Type {args.contact_type} for {account_id}: {e}")
