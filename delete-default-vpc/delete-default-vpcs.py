@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, ProfileNotFound
 import logging
 import os
 
@@ -10,7 +10,11 @@ max_workers = 10
 def main(args, logger):
     '''Executes the Primary Logic'''
 
-    session = boto3.Session(profile_name=args.profile, region_name=args.boto_region)
+    try:
+        session = boto3.Session(profile_name=args.profile, region_name=args.boto_region)
+    except ProfileNotFound as e:
+        logger.critical(f"Profile {args.profile} was not found: {e}")
+        exit(1)
 
     # Get all the Regions for this account
     all_regions = get_regions(session, args)
@@ -241,10 +245,15 @@ if __name__ == '__main__':
     logging.getLogger('urllib3').setLevel(logging.WARNING)
 
     # create formatter
-    if args.timestamp:
+    if args.timestamp and args.profile:
+        formatter = logging.Formatter(f"%(asctime)s - %(name)s - %(levelname)s - {args.profile} - %(message)s")
+    elif args.timestamp:
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    elif  args.profile:
+        formatter = logging.Formatter(f"%(levelname)s - {args.profile} - %(message)s")
     else:
         formatter = logging.Formatter('%(levelname)s - %(message)s')
+
     # add formatter to ch (console handler)
     ch.setFormatter(formatter)
     # add ch to logger
