@@ -21,7 +21,13 @@ def main(args, logger):
 
     # processiong regions
     for region in all_regions:
-        process_region(args, region, session, logger)
+        try:
+            process_region(args, region, session, logger)
+        except ClientError as e:
+            if e.response['Error']['Code'] == "RegionDisabledException":
+                logger.critical(f"Region {region} is not enabled. Skipping...")
+            else:
+                raise
 
     return
 
