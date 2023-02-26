@@ -18,7 +18,13 @@ def main(args, logger):
 
     # processiong regions
     for region in all_regions:
-        process_region(args, region, session, logger)
+        try:
+            process_region(args, region, session, logger)
+        except ClientError as e:
+            if e.response['Error']['Code'] == "UnauthorizedOperation":
+                logger.error(f"Failed to process region {region}. Denied by SCP?")
+            else:
+                raise
 
     return
 
@@ -37,14 +43,17 @@ def process_region(args, region, session, logger):
     if vpcs:
         # processing VPCs
         for VpcId in vpcs:
-            # enable flowlogs if the vpc has eni within it
-            logger.debug(f"   Processing VpcId {VpcId}")
-            network_interfaces = ec2_client.describe_network_interfaces(Filters=[{'Name':'vpc-id','Values':[VpcId]}])['NetworkInterfaces']
-            if network_interfaces:
-                logger.debug(f"   ENI found in VpcId {VpcId}")
+            if args.process_empty:
                 enable_flowlogs(VpcId, ec2_client, args, region)
             else:
-                logger.debug(f"   No ENI found in VpcId {VpcId}, skipped.")
+                # enable flowlogs if the vpc has eni within it
+                logger.debug(f"   Processing VpcId {VpcId}")
+                network_interfaces = ec2_client.describe_network_interfaces(Filters=[{'Name':'vpc-id','Values':[VpcId]}])['NetworkInterfaces']
+                if network_interfaces:
+                    logger.debug(f"   ENI found in VpcId {VpcId}")
+                    enable_flowlogs(VpcId, ec2_client, args, region)
+                else:
+                    logger.debug(f"   No ENI found in VpcId {VpcId}, skipped.")
     else:
         logger.debug("   No VPCs to enable flow logs in region:{}".format(region))
 
@@ -186,6 +195,7 @@ def do_args():
     parser.add_argument("--profile", help="Use this CLI profile (instead of default or env credentials)")
     parser.add_argument("--vpc-id", help="Only Process Specified VPC")
     parser.add_argument("--actually-do-it", help="Actually Perform the action", action='store_true')
+    parser.add_argument("--process-empty", help="Process empty VPCs too", action='store_true')
     parser.add_argument("--flowlog-bucket", help="S3 bucket to deposit logs to", required=True)
     parser.add_argument("--traffic-type", help="The type of traffic to log", default='ALL', choices=['ACCEPT','REJECT','ALL'])
     parser.add_argument("--force", help="Perform flowlog replacement without prompt", action='store_true')
