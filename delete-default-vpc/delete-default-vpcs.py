@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, ProfileNotFound
 import logging
 import os
 
@@ -10,14 +10,24 @@ max_workers = 10
 def main(args, logger):
     '''Executes the Primary Logic'''
 
-    session = boto3.Session(profile_name=args.profile, region_name=args.boto_region)
+    try:
+        session = boto3.Session(profile_name=args.profile, region_name=args.boto_region)
+    except ProfileNotFound as e:
+        logger.critical(f"Profile {args.profile} was not found: {e}")
+        exit(1)
 
     # Get all the Regions for this account
     all_regions = get_regions(session, args)
 
     # processiong regions
     for region in all_regions:
-        process_region(args, region, session, logger)
+        try:
+            process_region(args, region, session, logger)
+        except ClientError as e:
+            if e.response['Error']['Code'] == "RegionDisabledException":
+                logger.critical(f"Region {region} is not enabled. Skipping...")
+            else:
+                raise
 
     return
 
@@ -127,8 +137,8 @@ def delete_vpc(vpc,logger,region,debug):
                 logger.debug("Interface:{} attached to {},  VPC:{}, region:{}".format(eni.id,eni.attachment,vpc.id,region))
         return
     else:
-        logger.info("Deleting default VPC:{}, region:{}".format(vpc.id,region))
         if args.actually_do_it:
+            logger.info("Deleting default VPC:{}, region:{}".format(vpc.id,region))
             try:
                 vpc_resources = {
                     # dependency order from https://aws.amazon.com/premiumsupport/knowledge-center/troubleshoot-dependency-error-delete-vpc/
@@ -156,9 +166,8 @@ def delete_vpc(vpc,logger,region,debug):
                     logger.error("VPC:{} can't be delete due to dependency, {}".format(vpc.id, e))
                 else:
                     raise
-
             logger.info("Successfully deleted default VPC:{}, region:{}".format(vpc.id,region))
-        if not args.actually_do_it:
+        else:
             logger.info("Would delete default VPC:{}, region:{}".format(vpc.id,region))
 
 def process_region(args, region, session, logger):
@@ -242,10 +251,15 @@ if __name__ == '__main__':
     logging.getLogger('urllib3').setLevel(logging.WARNING)
 
     # create formatter
-    if args.timestamp:
+    if args.timestamp and args.profile:
+        formatter = logging.Formatter(f"%(asctime)s - %(name)s - %(levelname)s - {args.profile} - %(message)s")
+    elif args.timestamp:
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    elif  args.profile:
+        formatter = logging.Formatter(f"%(levelname)s - {args.profile} - %(message)s")
     else:
         formatter = logging.Formatter('%(levelname)s - %(message)s')
+
     # add formatter to ch (console handler)
     ch.setFormatter(formatter)
     # add ch to logger

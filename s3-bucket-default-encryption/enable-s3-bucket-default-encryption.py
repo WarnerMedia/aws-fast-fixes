@@ -43,6 +43,9 @@ def main(args, logger):
             elif e.response['Error']['Code'] == 'AccessDeniedException':
                 logger.warning(f"Unable to get details of key {bucket}: AccessDenied")
                 continue
+            elif e.response['Error']['Code'] == 'AccessDenied':
+                logger.warning(f"Unable to get details of key {bucket}: AccessDenied")
+                continue
             else:
                 raise
 

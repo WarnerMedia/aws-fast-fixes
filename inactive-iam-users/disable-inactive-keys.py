@@ -18,12 +18,15 @@ def main(args, logger):
     else:
         session = boto3.Session()
 
+    utc=pytz.UTC  # We need to normalize the date & timezones
+    threshold_date = utc.localize(datetime.today() - timedelta(days=int(args.threshold)))
+
     # S3 is a global service and we can use any regional endpoint for this.
     iam_client = session.client("iam")
     for user in get_all_users(iam_client):
         username = user['UserName']
 
-        keys = get_users_keys(iam_client, username)
+        keys = get_users_keys(iam_client, username, threshold_date)
         if len(keys) == 0:
             logger.debug(f"User {username} has no active keys")
             continue
@@ -35,23 +38,30 @@ def main(args, logger):
             if 'AccessKeyLastUsed' not in activity_response :
                 logger.error(f"Did not get AccessKeyLastUsed for user {username} key {key}")
                 continue
-            if 'LastUsedDate' not in activity_response['AccessKeyLastUsed']:
-                logger.debug(f"Key {key} for {username} has never been used")
+            elif 'LastUsedDate' not in activity_response['AccessKeyLastUsed']:
+                # logger.info(f"Key {key} for {username} has never been used, but is older than {args.threshold} days")
+                if args.actually_do_it is True:
+                    # otherwise if we're configured to fix
+                    logger.info(f"Disabling Key {key} for {username} - never been used, but is older than {args.threshold} days")
+                    disable_key(iam_client, key, username)
+                else:
+                    # otherwise just report
+                    logger.info(f"Need to Disable Key {key} for {username} - never been used, but is older than {args.threshold} days")
                 continue
-
-            # Otherwise decide what to do
-            last_used_date = activity_response['AccessKeyLastUsed']['LastUsedDate']
-            utc=pytz.UTC  # We need to normalize the date & timezones
-            if last_used_date > utc.localize(datetime.today() - timedelta(days=int(args.threshold))):
-                # Then we are good
-                logger.debug(f"Key {key} ({username}) - last used {last_used_date} is OK")
-            elif args.actually_do_it is True:
-                # otherwise if we're configured to fix
-                logger.info(f"Disabling Key {key} for {username} - Last used {activity_response['AccessKeyLastUsed']['LastUsedDate']} in {activity_response['AccessKeyLastUsed']['Region']} for {activity_response['AccessKeyLastUsed']['ServiceName']}")
-                disable_key(iam_client, key, username)
             else:
-                # otherwise just report
-                logger.info(f"Need to Disable Key {key} for {username} - Last used {activity_response['AccessKeyLastUsed']['LastUsedDate']} in {activity_response['AccessKeyLastUsed']['Region']} for {activity_response['AccessKeyLastUsed']['ServiceName']}")
+                # Otherwise decide what to do
+                last_used_date = activity_response['AccessKeyLastUsed']['LastUsedDate']
+
+                if last_used_date > threshold_date:
+                    # Then we are good
+                    logger.debug(f"Key {key} ({username}) - last used {last_used_date} is OK")
+                elif args.actually_do_it is True:
+                    # otherwise if we're configured to fix
+                    logger.info(f"Disabling Key {key} for {username} - Last used {activity_response['AccessKeyLastUsed']['LastUsedDate']} in {activity_response['AccessKeyLastUsed']['Region']} for {activity_response['AccessKeyLastUsed']['ServiceName']}")
+                    disable_key(iam_client, key, username)
+                else:
+                    # otherwise just report
+                    logger.info(f"Need to Disable Key {key} for {username} - Last used {activity_response['AccessKeyLastUsed']['LastUsedDate']} in {activity_response['AccessKeyLastUsed']['Region']} for {activity_response['AccessKeyLastUsed']['ServiceName']}")
 
 
 
@@ -69,12 +79,14 @@ def disable_key(iam_client, key, username):
         return(False)
 
 
-def get_users_keys(iam_client, username):
+def get_users_keys(iam_client, username, threshold_date):
     '''Return Active Access keys for username'''
     keyids = []
     response = iam_client.list_access_keys(UserName=username)
     if 'AccessKeyMetadata' in response:
         for k in response['AccessKeyMetadata']:
+            if k['CreateDate'] > threshold_date:
+                continue
             if k['Status'] == "Active":
                 keyids.append(k['AccessKeyId'])
     return(keyids)
